@@ -111,6 +111,7 @@ export function FooterLinks() {
   const base = `/t/${snap.tournament.slug}`;
   return (
     <div className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[12px] font-semibold text-white/45">
+      <Link to={`${base}/upute`}>Kako koristiti</Link>
       <Link to={`${base}/info`}>O turniru</Link>
       <Link to={`${base}/poredak`}>Konačni poredak</Link>
       {!session && <Link to={`${base}/prijava`}>Prijava</Link>}

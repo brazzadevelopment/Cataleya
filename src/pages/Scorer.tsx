@@ -25,7 +25,8 @@ export function ScorerList({ embedded = false }: { embedded?: boolean }) {
     <div>
       <div className={`flex items-center gap-2 ${embedded ? 'hidden' : ''}`}>
         <h1 className="heading text-lg">Zapisnik · {fieldName(snap, fieldId)}</h1>
-        <button type="button" onClick={() => setSession(null)} className="ml-auto inline-flex h-9 items-center gap-1 text-[12px] font-bold text-white/55">
+        <Link to={`${base}/upute-zapisnicar`} className="ml-auto text-[12px] font-bold text-gold">Upute</Link>
+        <button type="button" onClick={() => setSession(null)} className="inline-flex h-9 items-center gap-1 pl-2 text-[12px] font-bold text-white/55">
           <Icon name="logout" className="size-4" /> Odjava
         </button>
       </div>

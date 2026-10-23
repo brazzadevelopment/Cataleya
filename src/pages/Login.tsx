@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button, Emblem } from '../components/ui';
 import { source } from '../data/source';
 import { useTournament } from '../data/TournamentContext';
@@ -62,6 +62,7 @@ export function Login() {
       />
       {error && <p className="mt-3 text-sm font-bold text-[#ff8197]">{error}</p>}
       <Button type="submit" disabled={pin.length < 4 || busy} className="mt-4 w-full">{busy ? 'Provjeravam…' : 'Uđi'}</Button>
+      <Link to={`${base}/upute-zapisnicar`} className="mt-5 inline-block text-[13px] font-bold text-gold">Upute za zapisničara</Link>
       {source.mode === 'demo' && (
         <p className="mt-6 text-[12px] leading-relaxed text-white/45">
           Demo PIN-ovi: organizator 9000

@@ -7,6 +7,7 @@ import { source } from './data/source';
 import type { Tournament } from './lib/types';
 import { dateSpan } from './lib/time';
 import { Bracket, FinalStandings } from './pages/Bracket';
+import { HelpParents, HelpScorekeeper } from './pages/Help';
 import { Home } from './pages/Home';
 import { Info } from './pages/Info';
 import { Login } from './pages/Login';
@@ -46,6 +47,8 @@ function TournamentRoutes() {
           <Route path="utakmica/:id" element={<MatchPage />} />
           <Route path="momcad/:id" element={<TeamPage />} />
           <Route path="info" element={<Info />} />
+          <Route path="upute" element={<HelpParents />} />
+          <Route path="upute-zapisnicar" element={<HelpScorekeeper />} />
           <Route path="prijava" element={<Login />} />
           <Route path="zapisnik" element={<ScorerList />} />
           <Route path="zapisnik/:matchId" element={<ScoreEntry />} />

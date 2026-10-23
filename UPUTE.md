@@ -15,7 +15,6 @@ Aplikacija za praćenje nogometnog turnira: raspored, rezultati uživo, tablice 
 Bez Supabase varijabli aplikacija radi u **demo načinu**: podaci Cataleya Cupa spremaju se samo u pregledniku na tom uređaju.
 
 ```bash
-cd turnir
 npm install
 npm run dev        # http://localhost:5173
 ```
@@ -41,8 +40,8 @@ U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezu
 
 ### 2.2 Vercel (hosting)
 
-1. Na https://vercel.com: **Add New → Project**, odaberi repozitorij `fran`.
-2. **Root Directory**: `turnir`. Framework se sam prepozna (Vite).
+1. Na https://vercel.com: **Add New → Project**, odaberi repozitorij `brazzadevelopment/Cataleya`.
+2. Framework se sam prepozna (Vite). Root Directory ostaje prazan.
 3. **Environment Variables**:
 
    | Naziv | Vrijednost |
@@ -53,7 +52,7 @@ U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezu
    | `SUPABASE_SERVICE_ROLE_KEY` | service_role ključ (tajno) |
    | `SESSION_SECRET` | dugi nasumični niz, npr. iz `openssl rand -hex 32` |
 
-4. **Deploy**. Aplikacija je na adresi poput `https://turnir-xxxx.vercel.app/t/cataleya-cup-2026`.
+4. **Deploy**. Aplikacija je na adresi poput `https://cataleya-xxxx.vercel.app/t/cataleya-cup-2026`.
 5. Po želji: **Settings → Domains** za vlastitu domenu.
 
 Nakon promjene varijabli treba **Redeploy**, jer se `VITE_` varijable ugrade u aplikaciju pri izradi.

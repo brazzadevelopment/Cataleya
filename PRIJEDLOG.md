@@ -90,7 +90,6 @@ Aplikacija ne izmišlja nogometna pravila. Organizator upisuje:
 
 Jedanaesterci se mogu upisati u bilo kojoj utakmici. Ako kriteriji ne razdvoje momčadi, organizator ručno odredi redoslijed.
 
-Aplikacija ide u mapu **`turnir/`** ovog repozitorija (na Vercelu se postavi *Root Directory* = `turnir`), da ne dira postojeći Ponte.
 
 ## 4. Pitanja
 

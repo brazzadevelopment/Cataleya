@@ -159,12 +159,12 @@ create table public.matches (
   category_id       uuid not null,
   stage             public.match_stage not null default 'group',
   group_id          uuid,
-  code              text check (code ~ '^[[:alnum:]_.-]{1,12}$'),  -- 'ČF1', 'PF1', 'F'
+  code              text check (code ~ '^[^[:space:]:]{1,12}$'),  -- 'ČF1', 'PF1', 'F'
   label             text,                                          -- 'Četvrtfinale 1'
   home_team_id      uuid,
   away_team_id      uuid,
-  home_source       text check (home_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[WL]:[[:alnum:]_.-]{1,12})$'),
-  away_source       text check (away_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[WL]:[[:alnum:]_.-]{1,12})$'),
+  home_source       text check (home_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[WL]:[^[:space:]:]{1,12})$'),
+  away_source       text check (away_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[WL]:[^[:space:]:]{1,12})$'),
   field_id          uuid,
   starts_at         timestamptz,                -- prazno = termin još nije poznat
   duration_minutes  smallint check (duration_minutes between 1 and 120),  -- prazno = iz kategorije
@@ -262,10 +262,10 @@ $$;
 
 -- Koja uloga pripada upisanom PIN-u (prazno ako PIN ne postoji).
 create function public.check_pin(p_tournament_id uuid, p_pin text)
-returns table (role public.pin_role, field_id uuid)
+returns table (id uuid, role public.pin_role, field_id uuid, updated_at timestamptz)
 language sql stable security definer set search_path = public, extensions
 as $$
-  select p.role, p.field_id
+  select p.id, p.role, p.field_id, p.updated_at
   from public.pins p
   where p.tournament_id = p_tournament_id
     and p.pin_hash = crypt(p_pin, p.pin_hash)

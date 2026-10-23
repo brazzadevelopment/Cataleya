@@ -1,0 +1,89 @@
+@import 'tailwindcss';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/montserrat/800.css';
+@import '@fontsource/montserrat/900.css';
+
+/* Boje s plakata Cataleya Cupa: tamnozelena podloga, žuti naslovi,
+   cvijet od ružičaste preko ljubičaste do tirkizne. */
+@theme {
+  --font-sans: 'Montserrat', system-ui, sans-serif;
+
+  --color-pitch-950: #061a10;
+  --color-pitch-900: #0a2617;
+  --color-pitch-850: #0c2f1c;
+  --color-pitch-800: #0f3d24;
+  --color-pitch-700: #165133;
+  --color-pitch-600: #1f6a43;
+  --color-line: rgb(255 255 255 / 0.1);
+
+  --color-gold: #f2c230;
+  --color-gold-soft: #f7d873;
+  --color-bloom-pink: #ff4fa3;
+  --color-bloom-violet: #a45be0;
+  --color-bloom-cyan: #46d3f0;
+  --color-live: #ff3b5c;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-pitch-950 font-sans text-white antialiased;
+    background-image:
+      radial-gradient(120% 60% at 50% -10%, rgb(31 106 67 / 0.55), transparent 60%),
+      repeating-linear-gradient(115deg, rgb(255 255 255 / 0.018) 0 14px, transparent 14px 28px);
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+  button, a, input, select, textarea {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-gold/80 focus-visible:ring-offset-0;
+  }
+}
+
+@utility bloom-text {
+  background: linear-gradient(90deg, var(--color-bloom-pink), var(--color-bloom-violet) 50%, var(--color-bloom-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bloom-border {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--color-pitch-850), var(--color-pitch-850)) padding-box,
+    linear-gradient(90deg, var(--color-bloom-pink), var(--color-bloom-violet), var(--color-bloom-cyan)) border-box;
+}
+
+@utility card {
+  @apply rounded-2xl border border-line bg-pitch-850/90 shadow-[0_8px_24px_-12px_rgb(0_0_0_/_0.6)];
+}
+
+@utility heading {
+  @apply font-black uppercase tracking-wide;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@utility animate-live {
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+@media print {
+  body {
+    background: white !important;
+  }
+}

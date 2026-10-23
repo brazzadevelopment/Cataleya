@@ -53,7 +53,7 @@ U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezu
    | `VITE_SUPABASE_URL` | Project URL |
    | `VITE_SUPABASE_ANON_KEY` | publishable / anon ključ |
 
-4. **Deploy**. Aplikacija je na adresi poput `https://cataleya.vercel.app/t/cataleya-cup-2026`.
+4. **Deploy**. Aplikacija je na adresi poput `https://cataleya-seven.vercel.app/t/cataleya-cup-2026`.
 5. Po želji: **Settings → Domains** za vlastitu domenu.
 
 Nakon promjene varijabli treba **Redeploy**, jer se `VITE_` varijable ugrade u aplikaciju pri izradi.

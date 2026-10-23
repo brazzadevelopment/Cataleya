@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Mutation } from '../lib/mutations';
 import type { Session, Snapshot } from '../lib/types';
+import { syncPush } from '../lib/push';
 import { source } from './source';
 
 interface Ctx {
@@ -72,6 +73,11 @@ function Loaded({ snap, reload, children }: { snap: Snapshot; reload: () => Prom
   const [session, setSess] = useState<Session | null>(() => readJson<Session | null>(`turnir.session.${tid}`, null));
 
   const validCat = cats.some((c) => c.id === categoryId) ? categoryId : cats[0]?.id ?? '';
+
+  // Server mora znati koje momčadi pratimo, ako su obavijesti uključene.
+  useEffect(() => {
+    syncPush(tid, [...favorites]).catch(() => undefined);
+  }, [tid, favorites]);
 
   const value: Ctx = {
     snap,

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MatchCard } from '../components/MatchCard';
+import { NotificationsCard } from '../components/Notifications';
 import { Empty, Icon, SectionTitle, StarButton, TeamBadge } from '../components/ui';
 import { useTournament } from '../data/TournamentContext';
 import { byTime, involves } from '../lib/view';
@@ -34,6 +35,8 @@ export function Mine() {
               </Link>
             ))}
           </div>
+
+          <div className="mt-4"><NotificationsCard /></div>
 
           <SectionTitle>Sljedeće</SectionTitle>
           {coming.length ? <div className="space-y-3">{coming.map((m) => <MatchCard key={m.id} match={m} />)}</div> : <Empty>Nema više zakazanih utakmica.</Empty>}

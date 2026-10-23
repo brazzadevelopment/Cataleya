@@ -239,6 +239,19 @@ create table public.app_secrets (
 insert into public.app_secrets (name, value)
 values ('session', encode(extensions.gen_random_bytes(32), 'hex'));
 
+-- Pretplate na obavijesti (web push) za omiljene momčadi. Bez osobnih
+-- podataka: samo adresa push servisa preglednika i popis momčadi.
+create table public.push_subscriptions (
+  endpoint       text primary key,
+  tournament_id  uuid not null references public.tournaments (id) on delete cascade,
+  p256dh         text not null,
+  auth           text not null,
+  team_ids       uuid[] not null default '{}',
+  events         text[] not null default '{goal,start,end,card}',
+  created_at     timestamptz not null default now()
+);
+create index push_subscriptions_teams on public.push_subscriptions using gin (team_ids);
+
 -- ---------------------------------------------------------------------
 -- Funkcije za PIN-ove (smije ih zvati samo server, service_role)
 -- ---------------------------------------------------------------------
@@ -324,8 +337,9 @@ alter table public.group_teams  enable row level security;
 alter table public.matches      enable row level security;
 alter table public.pins         enable row level security;
 alter table public.app_secrets  enable row level security;
+alter table public.push_subscriptions enable row level security;
 
-revoke all on public.pins, public.app_secrets from anon, authenticated;
+revoke all on public.pins, public.app_secrets, public.push_subscriptions from anon, authenticated;
 
 do $$
 declare

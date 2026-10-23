@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeAdvancement } from '../src/lib/advancement.js';
 import { authorize, MutationError, type Mutation, type TableName } from '../src/lib/mutations.js';
 import type { Group, GroupTeam, Match, Role, Tournament } from '../src/lib/types.js';
+import { checkSubscribe, type MatchChange, type SubscribeBody } from './notify.js';
 
 export interface TokenData {
   t: string; // tournament id
@@ -21,6 +22,8 @@ export interface TokenData {
 export interface Reply {
   status: number;
   body: unknown;
+  /** Promijenjene utakmice, za obavijesti nakon odgovora. */
+  changes?: MatchChange[];
 }
 
 const SESSION_DAYS = 4;
@@ -92,12 +95,13 @@ export async function mutate(db: SupabaseClient, secret: string, token: string |
   if (!(await pinStillValid(db, session))) return fail(401, 'PIN je promijenjen. Upiši novi PIN.');
 
   const categories = new Set<string>();
+  const changes: MatchChange[] = [];
   try {
     for (const raw of mutations) {
-      for (const c of await apply(db, session, raw)) categories.add(c);
+      for (const c of await apply(db, session, raw, changes)) categories.add(c);
     }
     for (const c of categories) await advance(db, session.t, c);
-    return { status: 200, body: { ok: true } };
+    return { status: 200, body: { ok: true }, changes };
   } catch (e) {
     if (e instanceof MutationError) return fail(e.status, e.message);
     console.error(e);
@@ -134,20 +138,56 @@ export async function upload(db: SupabaseClient, secret: string, token: string |
   return { status: 200, body: { path } };
 }
 
+// ---------------------------------------------------------------------
+// POST subscribe / unsubscribe: obavijesti za omiljene momčadi (bez PIN-a)
+// ---------------------------------------------------------------------
+
+export async function subscribe(db: SupabaseClient, body: unknown): Promise<Reply> {
+  const err = checkSubscribe(body);
+  if (err) return fail(400, err);
+  const b = body as SubscribeBody;
+  const { error } = await db.from('push_subscriptions').upsert({
+    endpoint: b.subscription.endpoint,
+    tournament_id: b.tournamentId,
+    p256dh: b.subscription.keys.p256dh,
+    auth: b.subscription.keys.auth,
+    team_ids: b.teamIds,
+    events: b.events,
+  }, { onConflict: 'endpoint' });
+  if (error) {
+    console.error(error);
+    return fail(500, 'Obavijesti nisu uključene. Pokušaj ponovno.');
+  }
+  return { status: 200, body: { ok: true } };
+}
+
+export async function unsubscribe(db: SupabaseClient, body: unknown): Promise<Reply> {
+  const endpoint = (body as { endpoint?: unknown } | null)?.endpoint;
+  if (typeof endpoint !== 'string' || endpoint.length > 1000) return fail(400, 'Neispravan zahtjev.');
+  const { error } = await db.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  if (error) {
+    console.error(error);
+    return fail(500, 'Obavijesti nisu isključene. Pokušaj ponovno.');
+  }
+  return { status: 200, body: { ok: true } };
+}
+
 const KEY: Partial<Record<TableName, string>> = { group_teams: 'team_id' };
 
 /** Primijeni jednu izmjenu; vrati kategorije kojima treba preračunati nastavak. */
-async function apply(db: SupabaseClient, s: TokenData, raw: Mutation): Promise<string[]> {
+async function apply(db: SupabaseClient, s: TokenData, raw: Mutation, changes: MatchChange[]): Promise<string[]> {
   const actor = { role: s.r, fieldId: s.f };
 
   if (raw.type === 'score') {
-    const { data: match } = await db.from('matches').select('id, field_id, category_id, tournament_id')
+    const { data: match } = await db.from('matches').select('*')
       .eq('id', raw.matchId).eq('tournament_id', s.t).maybeSingle();
     const m = authorize(raw, actor, match);
     if (m.type !== 'score') return [];
     const { error } = await db.from('matches').update(m.patch).eq('id', m.matchId).eq('tournament_id', s.t);
     if (error) throw error;
-    return [match!.category_id];
+    const before = match as Match;
+    changes.push({ before, after: { ...before, ...m.patch } as Match });
+    return [before.category_id];
   }
 
   const m = authorize(raw, actor);
@@ -180,12 +220,16 @@ async function apply(db: SupabaseClient, s: TokenData, raw: Mutation): Promise<s
   const id = m.row[key];
   if (typeof id !== 'string') throw new MutationError('Nedostaje oznaka zapisa.');
   // Zapis s istim id-jem ne smije pripadati drugom turniru.
-  const { data: existing } = await db.from(m.table).select('tournament_id').eq(key, id).maybeSingle();
+  const { data: existing } = await db.from(m.table).select(m.table === 'matches' ? '*' : 'tournament_id').eq(key, id).maybeSingle();
   if (existing && (existing as { tournament_id: string }).tournament_id !== s.t) throw new MutationError('Nemaš ovlasti za taj zapis.', 403);
 
   const row: Record<string, unknown> = { ...m.row, tournament_id: s.t };
   const { error } = await db.from(m.table).upsert(row, { onConflict: m.table === 'group_teams' ? 'group_id,team_id' : 'id' });
   if (error) throw error;
+  if (m.table === 'matches' && existing) {
+    const before = existing as unknown as Match;
+    changes.push({ before, after: { ...before, ...row } as Match });
+  }
   const cat = row.category_id as string | undefined;
   if (m.table === 'matches' || m.table === 'group_teams') {
     if (cat) return [cat];
@@ -224,3 +268,7 @@ async function advance(db: SupabaseClient, tournamentId: string, categoryId: str
     if (error) throw error;
   }
 }
+
+export { notify, type MatchChange } from './notify.js';
+export type { VapidKeys } from './push.js';
+export { b64urlEncode, rawPublicKey } from './push.js';

@@ -12,6 +12,7 @@ import { Home } from './pages/Home';
 import { Info } from './pages/Info';
 import { Login } from './pages/Login';
 import { MatchPage } from './pages/MatchPage';
+import { NotifyGuide } from './pages/NotifyGuide';
 import { Mine } from './pages/Mine';
 import { Poster } from './pages/Poster';
 import { Schedule } from './pages/Schedule';
@@ -48,6 +49,7 @@ function TournamentRoutes() {
           <Route path="momcad/:id" element={<TeamPage />} />
           <Route path="info" element={<Info />} />
           <Route path="upute" element={<HelpParents />} />
+          <Route path="obavijesti" element={<NotifyGuide />} />
           <Route path="upute-zapisnicar" element={<HelpScorekeeper />} />
           <Route path="prijava" element={<Login />} />
           <Route path="zapisnik" element={<ScorerList />} />

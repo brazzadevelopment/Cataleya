@@ -65,6 +65,7 @@ export function HelpParents() {
 
       <SectionTitle>Dobro je znati</SectionTitle>
       <div className="space-y-3">
+        <Tip><b>Obavijesti na mobitel.</b> Za svaki gol, početak, kraj i karton tvojih momčadi. Uključuju se u Moje, a <Link to={`${base}/obavijesti`} className="font-bold text-gold">ovdje su upute i video</Link>.</Tip>
         <Tip><b>Rezultat uživo.</b> Zapisničar uz teren upisuje golove, a rezultat se kod tebe osvježi sam za sekundu-dvije. Ne treba osvježavati stranicu.</Tip>
         <Tip><b>Gdje je teren?</b> Otvori utakmicu: piše teren i lokacija. Popis svih terena je u <Link to={`${base}/info`} className="font-bold text-gold">O turniru</Link>.</Tip>
         <Tip><b>Podijeli.</b> Svaka utakmica i momčad ima gumb Podijeli (WhatsApp, Instagram, link).</Tip>

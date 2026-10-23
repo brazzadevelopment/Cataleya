@@ -30,7 +30,7 @@ function writeQueue(q: Queued[]): void {
 }
 
 interface Api {
-  post<T>(action: 'login' | 'mutate' | 'upload', body: unknown, token?: string): Promise<T>;
+  post<T>(action: 'login' | 'mutate' | 'upload' | 'push-key' | 'subscribe' | 'unsubscribe', body: unknown, token?: string): Promise<T>;
 }
 
 function api(url: string, anonKey: string): Api {
@@ -154,6 +154,11 @@ export function createLiveSource(url: string, anonKey: string): DataSource {
       });
       const res = await post<{ path: string }>('upload', { name: file.name, type: file.type, data }, session.token);
       return res.path;
+    },
+    push: {
+      key: async () => (await post<{ key: string }>('push-key', {})).key,
+      subscribe: async (body) => void (await post('subscribe', body)),
+      unsubscribe: async (endpoint) => void (await post('unsubscribe', { endpoint })),
     },
   };
 }

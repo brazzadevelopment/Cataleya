@@ -347,6 +347,201 @@ function authorize(m, actor, match) {
   return { ...m, row };
 }
 
+// server/push.ts
+var subtle = globalThis.crypto.subtle;
+var enc = new TextEncoder();
+function b64urlEncode(bytes) {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecode(s) {
+  const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+}
+function concat(...parts) {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let i = 0;
+  for (const p of parts) {
+    out.set(p, i);
+    i += p.length;
+  }
+  return out;
+}
+async function hmac(key, data) {
+  const k = await subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await subtle.sign("HMAC", k, data));
+}
+function rawPublicKey(jwk) {
+  return concat(new Uint8Array([4]), b64urlDecode(jwk.x), b64urlDecode(jwk.y));
+}
+function publicJwk(raw) {
+  return { kty: "EC", crv: "P-256", x: b64urlEncode(raw.slice(1, 33)), y: b64urlEncode(raw.slice(33, 65)), ext: true };
+}
+async function encryptPayload(payload, sub, opts = {}) {
+  const uaPublic = b64urlDecode(sub.p256dh);
+  const authSecret = b64urlDecode(sub.auth);
+  let senderPrivate;
+  let senderPublic;
+  if (opts.senderJwk) {
+    senderPrivate = await subtle.importKey("jwk", opts.senderJwk, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+    senderPublic = rawPublicKey(opts.senderJwk);
+  } else {
+    const pair = await subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+    senderPrivate = pair.privateKey;
+    senderPublic = new Uint8Array(await subtle.exportKey("raw", pair.publicKey));
+  }
+  const uaKey = await subtle.importKey("jwk", publicJwk(uaPublic), { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const ecdh = new Uint8Array(await subtle.deriveBits({ name: "ECDH", public: uaKey }, senderPrivate, 256));
+  const one = new Uint8Array([1]);
+  const prkKey = await hmac(authSecret, ecdh);
+  const ikm = await hmac(prkKey, concat(enc.encode("WebPush: info\0"), uaPublic, senderPublic, one));
+  const salt = opts.salt ?? globalThis.crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hmac(salt, ikm);
+  const cek = (await hmac(prk, concat(enc.encode("Content-Encoding: aes128gcm\0"), one))).slice(0, 16);
+  const nonce = (await hmac(prk, concat(enc.encode("Content-Encoding: nonce\0"), one))).slice(0, 12);
+  const key = await subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  const cipher = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, concat(payload, new Uint8Array([2]))));
+  const header = new Uint8Array(21);
+  header.set(salt, 0);
+  new DataView(header.buffer).setUint32(16, 4096);
+  header[20] = senderPublic.length;
+  return concat(header, senderPublic, cipher);
+}
+async function vapidAuthorization(endpoint, keys, now = Date.now()) {
+  const head = b64urlEncode(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = b64urlEncode(enc.encode(JSON.stringify({
+    aud: new URL(endpoint).origin,
+    exp: Math.floor(now / 1e3) + 12 * 3600,
+    sub: keys.subject
+  })));
+  const key = await subtle.importKey("jwk", keys.privateJwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(`${head}.${claims}`)));
+  return `vapid t=${head}.${claims}.${b64urlEncode(sig)}, k=${b64urlEncode(rawPublicKey(keys.privateJwk))}`;
+}
+async function sendPush(sub, message, keys, topic) {
+  const body = await encryptPayload(enc.encode(JSON.stringify(message)), sub);
+  const res = await fetch(sub.endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: await vapidAuthorization(sub.endpoint, keys),
+      "Content-Encoding": "aes128gcm",
+      "Content-Type": "application/octet-stream",
+      TTL: "3600",
+      Urgency: "high",
+      ...topic ? { Topic: topic } : {}
+    },
+    body
+  });
+  return res.status;
+}
+var PUSH_HOSTS = [
+  /^fcm\.googleapis\.com$/,
+  /^jmt\d+\.google\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /^web\.push\.apple\.com$/,
+  /\.push\.apple\.com$/,
+  /\.notify\.windows\.com$/
+];
+function isPushEndpoint(endpoint) {
+  if (typeof endpoint !== "string" || endpoint.length > 1e3) return false;
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname));
+  } catch {
+    return false;
+  }
+}
+
+// server/notify.ts
+var PUSH_EVENTS = ["goal", "start", "end", "card"];
+function scoreLine(m, home, away) {
+  const pens = m.home_penalties != null && m.away_penalties != null ? ` (jedanaesterci ${m.home_penalties}:${m.away_penalties})` : "";
+  return `${home} ${m.home_score ?? 0}:${m.away_score ?? 0} ${away}${pens}`;
+}
+function matchNotes(c, name, where = "") {
+  const { before: b, after: a } = c;
+  if (!a.home_team_id || !a.away_team_id) return [];
+  const home = name(a.home_team_id);
+  const away = name(a.away_team_id);
+  const teams = [a.home_team_id, a.away_team_id];
+  const tail = where ? ` \xB7 ${where}` : "";
+  const note = (event, title, body) => ({ event, matchId: a.id, teams, title, body });
+  const out = [];
+  if (b.status === "scheduled" && a.status === "live") {
+    out.push(note("start", "\u25B6\uFE0F Po\u010Dela je utakmica", `${home} \u2013 ${away}${tail}`));
+  }
+  if (a.status === "live") {
+    if ((a.home_score ?? 0) > (b.home_score ?? 0)) out.push(note("goal", `\u26BD Gol! ${home}`, scoreLine(a, home, away)));
+    if ((a.away_score ?? 0) > (b.away_score ?? 0)) out.push(note("goal", `\u26BD Gol! ${away}`, scoreLine(a, home, away)));
+  }
+  if (b.status !== "finished" && a.status === "finished") {
+    out.push(note("end", "\u{1F3C1} Kraj utakmice", scoreLine(a, home, away) + tail));
+  }
+  const cards = [
+    ["home_yellow", "\u{1F7E8} \u017Duti karton", home],
+    ["away_yellow", "\u{1F7E8} \u017Duti karton", away],
+    ["home_red", "\u{1F7E5} Crveni karton", home],
+    ["away_red", "\u{1F7E5} Crveni karton", away]
+  ];
+  for (const [k, title, team] of cards) {
+    if ((a[k] ?? 0) > (b[k] ?? 0)) out.push(note("card", `${title}: ${team}`, `${home} \u2013 ${away}${tail}`));
+  }
+  return out;
+}
+async function notify(db, keys, tournamentId, changes) {
+  if (!changes.length) return;
+  const ids = [...new Set(changes.flatMap((c) => [c.after.home_team_id, c.after.away_team_id]).filter((x) => !!x))];
+  if (!ids.length) return;
+  const [teams, fields, cats, tour, subs] = await Promise.all([
+    db.from("teams").select("id, name").in("id", ids),
+    db.from("fields").select("id, name").eq("tournament_id", tournamentId),
+    db.from("categories").select("id, name").eq("tournament_id", tournamentId),
+    db.from("tournaments").select("slug").eq("id", tournamentId).single(),
+    db.from("push_subscriptions").select("endpoint, p256dh, auth, team_ids, events").eq("tournament_id", tournamentId).overlaps("team_ids", ids)
+  ]);
+  if (subs.error) throw subs.error;
+  const names = new Map((teams.data ?? []).map((t) => [t.id, t.name]));
+  const fieldName = new Map((fields.data ?? []).map((f) => [f.id, f.name]));
+  const catName = new Map((cats.data ?? []).map((c) => [c.id, c.name]));
+  const slug = tour.data?.slug ?? "";
+  const notes = changes.flatMap((c) => {
+    const where = [catName.get(c.after.category_id) && `${catName.get(c.after.category_id)} godi\u0161te`, c.after.field_id && fieldName.get(c.after.field_id)].filter(Boolean).join(" \xB7 ");
+    return matchNotes(c, (id) => names.get(id) ?? "?", where);
+  });
+  const gone = /* @__PURE__ */ new Set();
+  const sends = [];
+  for (const s of subs.data ?? []) {
+    if (!isPushEndpoint(s.endpoint)) continue;
+    for (const n of notes) {
+      if (!s.events.includes(n.event) || !n.teams.some((t) => s.team_ids.includes(t))) continue;
+      const message = { title: n.title, body: n.body, tag: n.matchId, url: `/t/${slug}/utakmica/${n.matchId}` };
+      sends.push(
+        sendPush(s, message, keys, n.matchId.replace(/-/g, "")).then((status) => {
+          if (status === 404 || status === 410) gone.add(s.endpoint);
+          else if (status >= 400) console.error("push", status, new URL(s.endpoint).host);
+        }).catch((e) => console.error("push", e))
+      );
+    }
+  }
+  await Promise.all(sends);
+  if (gone.size) await db.from("push_subscriptions").delete().in("endpoint", [...gone]);
+}
+var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+var B64URL = /^[A-Za-z0-9_-]+$/;
+function checkSubscribe(body) {
+  const b = body;
+  if (!b || typeof b.tournamentId !== "string" || !UUID.test(b.tournamentId)) return "Nepoznat turnir.";
+  const s = b.subscription;
+  if (!s || !isPushEndpoint(s.endpoint)) return "Ovaj preglednik ne podr\u017Eava obavijesti.";
+  const { p256dh, auth } = s.keys ?? {};
+  if (typeof p256dh !== "string" || !B64URL.test(p256dh) || p256dh.length !== 87) return "Neispravna pretplata.";
+  if (typeof auth !== "string" || !B64URL.test(auth) || auth.length !== 22) return "Neispravna pretplata.";
+  if (!Array.isArray(b.teamIds) || b.teamIds.length > 60 || !b.teamIds.every((t) => typeof t === "string" && UUID.test(t))) return "Neispravan popis mom\u010Dadi.";
+  if (!Array.isArray(b.events) || !b.events.every((e) => PUSH_EVENTS.includes(e))) return "Neispravan popis obavijesti.";
+  return null;
+}
+
 // server/core.ts
 var SESSION_DAYS = 4;
 var fail = (status, error) => ({ status, body: { error } });
@@ -400,12 +595,13 @@ async function mutate(db, secret, token, body) {
   }
   if (!await pinStillValid(db, session)) return fail(401, "PIN je promijenjen. Upi\u0161i novi PIN.");
   const categories = /* @__PURE__ */ new Set();
+  const changes = [];
   try {
     for (const raw of mutations) {
-      for (const c of await apply(db, session, raw)) categories.add(c);
+      for (const c of await apply(db, session, raw, changes)) categories.add(c);
     }
     for (const c of categories) await advance(db, session.t, c);
-    return { status: 200, body: { ok: true } };
+    return { status: 200, body: { ok: true }, changes };
   } catch (e) {
     if (e instanceof MutationError) return fail(e.status, e.message);
     console.error(e);
@@ -435,16 +631,46 @@ async function upload(db, secret, token, body) {
   }
   return { status: 200, body: { path } };
 }
+async function subscribe(db, body) {
+  const err = checkSubscribe(body);
+  if (err) return fail(400, err);
+  const b = body;
+  const { error } = await db.from("push_subscriptions").upsert({
+    endpoint: b.subscription.endpoint,
+    tournament_id: b.tournamentId,
+    p256dh: b.subscription.keys.p256dh,
+    auth: b.subscription.keys.auth,
+    team_ids: b.teamIds,
+    events: b.events
+  }, { onConflict: "endpoint" });
+  if (error) {
+    console.error(error);
+    return fail(500, "Obavijesti nisu uklju\u010Dene. Poku\u0161aj ponovno.");
+  }
+  return { status: 200, body: { ok: true } };
+}
+async function unsubscribe(db, body) {
+  const endpoint = body?.endpoint;
+  if (typeof endpoint !== "string" || endpoint.length > 1e3) return fail(400, "Neispravan zahtjev.");
+  const { error } = await db.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (error) {
+    console.error(error);
+    return fail(500, "Obavijesti nisu isklju\u010Dene. Poku\u0161aj ponovno.");
+  }
+  return { status: 200, body: { ok: true } };
+}
 var KEY = { group_teams: "team_id" };
-async function apply(db, s, raw) {
+async function apply(db, s, raw, changes) {
   const actor = { role: s.r, fieldId: s.f };
   if (raw.type === "score") {
-    const { data: match } = await db.from("matches").select("id, field_id, category_id, tournament_id").eq("id", raw.matchId).eq("tournament_id", s.t).maybeSingle();
+    const { data: match } = await db.from("matches").select("*").eq("id", raw.matchId).eq("tournament_id", s.t).maybeSingle();
     const m2 = authorize(raw, actor, match);
     if (m2.type !== "score") return [];
     const { error: error2 } = await db.from("matches").update(m2.patch).eq("id", m2.matchId).eq("tournament_id", s.t);
     if (error2) throw error2;
-    return [match.category_id];
+    const before = match;
+    changes.push({ before, after: { ...before, ...m2.patch } });
+    return [before.category_id];
   }
   const m = authorize(raw, actor);
   if (m.type === "setPin") {
@@ -471,11 +697,15 @@ async function apply(db, s, raw) {
   const key = KEY[m.table] ?? "id";
   const id = m.row[key];
   if (typeof id !== "string") throw new MutationError("Nedostaje oznaka zapisa.");
-  const { data: existing } = await db.from(m.table).select("tournament_id").eq(key, id).maybeSingle();
+  const { data: existing } = await db.from(m.table).select(m.table === "matches" ? "*" : "tournament_id").eq(key, id).maybeSingle();
   if (existing && existing.tournament_id !== s.t) throw new MutationError("Nema\u0161 ovlasti za taj zapis.", 403);
   const row = { ...m.row, tournament_id: s.t };
   const { error } = await db.from(m.table).upsert(row, { onConflict: m.table === "group_teams" ? "group_id,team_id" : "id" });
   if (error) throw error;
+  if (m.table === "matches" && existing) {
+    const before = existing;
+    changes.push({ before, after: { ...before, ...row } });
+  }
   const cat = row.category_id;
   if (m.table === "matches" || m.table === "group_teams") {
     if (cat) return [cat];
@@ -510,9 +740,14 @@ async function advance(db, tournamentId, categoryId) {
   }
 }
 export {
+  b64urlEncode,
   login,
   mutate,
+  notify,
+  rawPublicKey,
   signToken,
+  subscribe,
+  unsubscribe,
   upload,
   verifyToken
 };

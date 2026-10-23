@@ -12,6 +12,12 @@ export interface DataSource {
   login(tournamentId: string, pin: string): Promise<Session | null>;
   mutate(session: Session, mutations: Mutation[]): Promise<void>;
   uploadImage(session: Session, file: File): Promise<string>;
+  /** Obavijesti na mobitel; samo pravi način (demo ih nema). */
+  push?: {
+    key(): Promise<string>;
+    subscribe(body: unknown): Promise<void>;
+    unsubscribe(endpoint: string): Promise<void>;
+  };
   /** Samo demo: vraća početne podatke. */
   reset?(): void;
   /** Samo demo: popuni rezultate skupina, da se vide tablice i ždrijeb. */

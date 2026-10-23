@@ -1,6 +1,6 @@
 # Cataleya Cup 2026: otvorena pitanja i što još treba
 
-Stanje: 23. 10. 2026. Kad nešto riješimo, prekriži ili obriši.
+Stanje: 23. 10. 2026. kasno navečer. Kad nešto riješimo, prekriži ili obriši.
 
 ## 1. Pitanja o pravilima (propozicije to ne kažu)
 
@@ -26,18 +26,17 @@ Stanje: 23. 10. 2026. Kad nešto riješimo, prekriži ili obriši.
 | 3.1 | „NK PRIMORAC STO” upisan je kao **NK Primorac Stobreč** | Provjeriti. |
 | 3.2 | Nazivi koji se u Excelu pišu različito | „SV Dinamo Helffort / Hellfort”, „NK Prvi gol / ŠN Prvi gol”, „GOŠK / GOŠK Kaštela”, „GNK Dinamo ZG bijeli / GNK Dinamo bijeli”. Uzet je naziv iz popisa skupina. |
 | 3.3 | Lokacije terena na Google Mapsu | Linkovi za SC Miro Surać, Arbanasi, SC Višnjik, Privlaka (umjetni) i Privlaka (prirodni). Upisuju se u Uređivanje → Tereni i PIN. |
-| 3.4 | Već odigrane utakmice | Turnir je počeo u petak u 15:00. Rezultate odigranih utakmica treba upisati. |
+| 3.4 | Petak: rezultati | Upisano 87 od 88 (iz tablica na Sofascoreu). Fali **Istra 1961 – SV Dinamo Helffort** (2016., C, 20:50): na Sofascoreu nije odigrana. Kartoni iz petka nisu upisani. |
 
-## 4. Postavljanje (da rezultati idu uživo svima)
+## 4. Postavljanje
+
+Gotovo: baza (Supabase), stranica https://cataleya-seven.vercel.app/t/cataleya-cup-2026, glavni PIN i 11 PIN-ova terena.
 
 | # | Što | Tko |
 |---|---|---|
-| 4.1 | Supabase račun i projekt (baza) | upute: UPUTE.md, odjeljak 2.1 |
-| 4.2 | Vercel račun (stranica na internetu) | upute: UPUTE.md, odjeljak 2.2 |
-| 4.3 | Adresa (domena), npr. cataleyacup.hr, ili besplatna Vercel adresa | |
-| 4.4 | Glavni PIN i 11 PIN-ova terena | Miro Surać 1–3, Arbanasi 1–2, Višnjik 1–2, Privlaka umjetni 1–2, Privlaka prirodni 1–2 |
-| 4.5 | Popis zapisničara: tko je na kojem terenu | Svaki dobije PIN svog terena i link na upute. |
-| 4.6 | QR plakati za ispis, po jedan za svaku lokaciju | Aplikacija: O turniru → QR plakat za ispis |
+| 4.1 | Ljepša adresa (npr. cataleyacup.hr ili cataleya-cup.vercel.app) | po želji, Vercel → Settings → Domains |
+| 4.2 | Popis zapisničara: tko je na kojem terenu | Svaki dobije PIN svog terena i link na prijavu. |
+| 4.3 | QR plakati za ispis, po jedan za svaku lokaciju | Aplikacija: O turniru → QR plakat za ispis |
 
 ## 5. Kasnije (nije nužno za ovaj turnir)
 

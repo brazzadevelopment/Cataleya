@@ -12,26 +12,35 @@ const SLOT = 92; // visina jednog mjesta u prvom stupcu (px)
 export function Bracket() {
   const { snap, categoryId } = useTournament();
   const ko = snap.matches.filter((m) => m.category_id === categoryId && m.stage !== 'group').sort(byTime);
+  if (!ko.length) {
+    return <Empty>Utakmice nastavka još nisu upisane. Organizator ih dodaje kad bude poznat raspored.</Empty>;
+  }
+  const brackets = [...new Set(ko.map((m) => m.bracket ?? ''))].sort();
+  return (
+    <div>
+      {brackets.map((b) => (
+        <BracketSection key={b || 'none'} title={b ? `${b} turnir` : 'Ždrijeb'} matches={ko.filter((m) => (m.bracket ?? '') === b)} />
+      ))}
+    </div>
+  );
+}
+
+function BracketSection({ title, matches: ko }: { title: string; matches: Match[] }) {
   const byCode = (a: Match, b: Match) => (a.code ?? '').localeCompare(b.code ?? '', 'hr', { numeric: true });
   const columns = ROUNDS.map((stage) => ({ stage, matches: ko.filter((m) => m.stage === stage).sort(byCode) })).filter((c) => c.matches.length);
   const third = ko.filter((m) => m.stage === 'third_place');
   const placement = ko.filter((m) => m.stage === 'placement');
-
-  if (!ko.length) {
-    return <Empty>Utakmice nastavka još nisu upisane. Organizator ih dodaje kad bude poznat raspored.</Empty>;
-  }
-
-  const height = Math.max(...columns.map((c) => c.matches.length)) * SLOT;
+  const height = Math.max(1, ...columns.map((c) => c.matches.length)) * SLOT;
 
   return (
-    <div>
+    <section>
       {columns.length > 0 && (
         <>
-          <SectionTitle>Ždrijeb</SectionTitle>
+          <SectionTitle>{title}</SectionTitle>
           <div className="no-scrollbar -mx-4 overflow-x-auto px-4 pb-2">
             <div className="flex gap-0" style={{ minHeight: height + 28 }}>
               {columns.map((col, ci) => (
-                <div key={col.stage} className="flex w-[196px] shrink-0 flex-col">
+                <div key={col.stage} className={`flex shrink-0 flex-col ${columns.length === 1 ? "w-full" : "w-[196px]"}`}>
                   <div className="mb-2 h-5 text-center text-[11px] font-extrabold tracking-wider text-gold uppercase">
                     {STAGE_LABEL[col.stage]}
                   </div>
@@ -48,24 +57,24 @@ export function Bracket() {
               )).flatMap((el, i) => (i === 0 ? [el] : [<div key={`gap-${i}`} className="w-6 shrink-0" />, el]))}
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-white/45">Povuci vodoravno za sljedeće krugove.</p>
+          {columns.length > 1 && <p className="mt-1 text-[11px] text-white/45">Povuci vodoravno za sljedeće krugove.</p>}
         </>
       )}
 
       {third.length > 0 && (
         <>
-          <SectionTitle>Za 3. mjesto</SectionTitle>
+          <SectionTitle>{title} · za 3. mjesto</SectionTitle>
           <div className="space-y-3">{third.map((m) => <MatchCard key={m.id} match={m} showPhase={false} />)}</div>
         </>
       )}
 
       {placement.length > 0 && (
         <>
-          <SectionTitle>Utakmice za plasman</SectionTitle>
+          <SectionTitle>{title} · za plasman</SectionTitle>
           <div className="space-y-3">{placement.map((m) => <MatchCard key={m.id} match={m} />)}</div>
         </>
       )}
-    </div>
+    </section>
   );
 }
 

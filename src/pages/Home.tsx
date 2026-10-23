@@ -19,6 +19,7 @@ export function Home() {
     : scheduled).slice(0, 4);
   const favTeams = snap.teams.filter((tm) => favorites.has(tm.id) && tm.category_id === categoryId);
   const podium = finalRanking(matches).filter((p) => p.place <= 3);
+  const venues = [...new Set(matches.map((m) => snap.fields.find((f) => f.id === m.field_id)?.venue).filter(Boolean))] as string[];
 
   return (
     <div>
@@ -27,12 +28,13 @@ export function Home() {
         <Emblem className="relative mx-auto size-24 drop-shadow-[0_0_24px_rgb(164_91_224_/_0.55)]" />
         <h1 className="heading relative mt-3 text-[30px] leading-none">{t.name}</h1>
         <p className="relative mt-2 text-[13px] font-bold tracking-[0.22em] text-gold uppercase">
-          {snap.categories.find((c) => c.id === categoryId)?.name}
+          {categoryTitle(snap.categories.find((c) => c.id === categoryId))}
         </p>
         <p className="relative mt-3 text-sm text-white/70">
           {dateSpan(t.start_date, t.end_date)} · {t.place}
           {t.venue ? ` · ${t.venue}` : ''}
         </p>
+        {venues.length > 0 && <p className="relative mt-1 text-[12px] text-white/50">{venues.join(' · ')}</p>}
       </section>
 
       {podium.length > 0 && (
@@ -96,6 +98,12 @@ export function Home() {
       <FooterLinks />
     </div>
   );
+}
+
+/** '2016. godište' ili naziv kategorije kakav jest. */
+export function categoryTitle(c: { name: string; birth_year: number | null } | undefined): string {
+  if (!c) return '';
+  return c.birth_year && /^\d{4}\.?$/.test(c.name.trim()) ? `${c.name} godište` : c.name;
 }
 
 export function FooterLinks() {

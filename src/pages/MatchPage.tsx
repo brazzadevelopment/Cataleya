@@ -55,7 +55,12 @@ export function MatchPage() {
             field.maps_url ? <a href={field.maps_url} target="_blank" rel="noreferrer" className="font-bold text-gold underline-offset-2 hover:underline">{field.name} · karta</a> : <b>{field.name}</b>
           ) : 'Još nije određen'}
         </Row>
-        <Row icon="info" label="Mjesto"><b>{snap.tournament.place}</b>{snap.tournament.venue ? `, ${snap.tournament.venue}` : ''}</Row>
+        <Row icon="info" label="Mjesto"><b>{field?.venue ?? snap.tournament.place}</b></Row>
+        {(m.home_yellow + m.home_red + m.away_yellow + m.away_red > 0) && (
+          <Row icon="edit" label="Kartoni">
+            <span className="font-bold">{cardText(m.home_yellow, m.home_red)} : {cardText(m.away_yellow, m.away_red)}</span>
+          </Row>
+        )}
       </div>
 
       <ShareButton
@@ -106,4 +111,9 @@ export function BackLink() {
       <Icon name="back" className="size-4" /> Natrag
     </button>
   );
+}
+
+function cardText(yellow: number, red: number): string {
+  const parts = [yellow ? `${yellow} ž` : '', red ? `${red} c` : ''].filter(Boolean);
+  return parts.join(' ') || '0';
 }

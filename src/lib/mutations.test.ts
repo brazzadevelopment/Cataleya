@@ -38,25 +38,25 @@ describe('tko smije što', () => {
 describe('primjena izmjena u demo načinu', () => {
   it('nakon zadnjeg rezultata skupine momčad se sama upiše u četvrtfinale', () => {
     let s = demoSnapshot();
-    const groupA = s.matches.filter((m) => m.group_id === 'grp-a');
+    const groupA = s.matches.filter((m) => m.group_id === 'u2019-grp-a');
     for (const m of groupA) {
       // NK Zagreb pobjeđuje sve; ostalo neriješeno 0:0, osim Arbanasi pobjeđuju Varaždin narančasti
-      const zagrebHome = m.home_team_id === 'tm-nk-zagreb';
-      const zagrebAway = m.away_team_id === 'tm-nk-zagreb';
-      const arb = m.home_team_id === 'tm-nk-varazdin-narancasti' && m.away_team_id === 'tm-nk-arbanasi';
+      const zagrebHome = m.home_team_id === 'tm-u2019-nk-zagreb';
+      const zagrebAway = m.away_team_id === 'tm-u2019-nk-zagreb';
+      const arb = m.home_team_id === 'tm-u2019-nk-varazdin-narancasti' && m.away_team_id === 'tm-u2019-nk-arbanasi';
       const [h, a] = zagrebHome ? [2, 0] : zagrebAway ? [0, 2] : arb ? [0, 1] : [0, 0];
       s = applyToSnapshot(s, { type: 'score', matchId: m.id, patch: { home_score: h, away_score: a, home_penalties: null, away_penalties: null, status: 'finished' } });
     }
     const qf1 = s.matches.find((m) => m.code === 'ČF1')!;
     const qf2 = s.matches.find((m) => m.code === 'ČF2')!;
-    expect(qf1.home_team_id).toBe('tm-nk-zagreb');
-    expect(qf2.away_team_id).toBe('tm-nk-arbanasi');
+    expect(qf1.home_team_id).toBe('tm-u2019-nk-zagreb');
+    expect(qf2.away_team_id).toBe('tm-u2019-nk-arbanasi');
   });
 
   it('brisanje momčadi je miče iz skupine i utakmica', () => {
-    const s = applyToSnapshot(demoSnapshot(), { type: 'delete', table: 'teams', id: 'tm-nk-zagreb' });
-    expect(s.teams.some((t) => t.id === 'tm-nk-zagreb')).toBe(false);
-    expect(s.groupTeams.some((g) => g.team_id === 'tm-nk-zagreb')).toBe(false);
-    expect(s.matches.some((m) => m.home_team_id === 'tm-nk-zagreb' || m.away_team_id === 'tm-nk-zagreb')).toBe(false);
+    const s = applyToSnapshot(demoSnapshot(), { type: 'delete', table: 'teams', id: 'tm-u2019-nk-zagreb' });
+    expect(s.teams.some((t) => t.id === 'tm-u2019-nk-zagreb')).toBe(false);
+    expect(s.groupTeams.some((g) => g.team_id === 'tm-u2019-nk-zagreb')).toBe(false);
+    expect(s.matches.some((m) => m.home_team_id === 'tm-u2019-nk-zagreb' || m.away_team_id === 'tm-u2019-nk-zagreb')).toBe(false);
   });
 });

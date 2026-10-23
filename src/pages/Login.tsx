@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Emblem } from '../components/ui';
 import { source } from '../data/source';
 import { useTournament } from '../data/TournamentContext';
+import { DEMO_PINS } from '../data/seed';
 
 export function Login() {
   const { snap, session, setSession } = useTournament();
@@ -62,7 +63,10 @@ export function Login() {
       {error && <p className="mt-3 text-sm font-bold text-[#ff8197]">{error}</p>}
       <Button type="submit" disabled={pin.length < 4 || busy} className="mt-4 w-full">{busy ? 'Provjeravam…' : 'Uđi'}</Button>
       {source.mode === 'demo' && (
-        <p className="mt-6 text-[12px] text-white/45">Demo PIN-ovi: organizator 9000, Teren 1 1111, Teren 2 2222</p>
+        <p className="mt-6 text-[12px] leading-relaxed text-white/45">
+          Demo PIN-ovi: organizator 9000
+          {snap.fields.map((f) => <span key={f.id}> · {f.name} {DEMO_PINS.fields[f.id]}</span>)}
+        </p>
       )}
     </form>
   );

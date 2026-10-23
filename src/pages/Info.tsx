@@ -13,6 +13,7 @@ const TIEBREAK_LABEL: Record<string, string> = {
   goals_for: 'više postignutih golova',
   wins: 'više pobjeda',
   fewer_goals_against: 'manje primljenih golova',
+  fewer_cards: 'manje žutih/crvenih kartona',
   lot: 'ždrijeb',
 };
 
@@ -37,14 +38,28 @@ export function Info() {
       </div>
 
       <SectionTitle>Tereni</SectionTitle>
-      <div className="card divide-y divide-line">
-        {snap.fields.map((f) => (
-          <div key={f.id} className="flex items-center gap-3 px-4 py-3">
-            <Icon name="pin" className="size-5 text-gold" />
-            <span className="flex-1 font-bold">{f.name}</span>
-            {f.maps_url && <a href={f.maps_url} target="_blank" rel="noreferrer" className="text-[13px] font-bold text-gold">Otvori kartu</a>}
-          </div>
-        ))}
+      <div className="space-y-3">
+        {[...new Set(snap.fields.map((f) => f.venue ?? ''))].map((venue) => {
+          const fs = snap.fields.filter((f) => (f.venue ?? '') === venue);
+          const cats = snap.categories.filter((c) => snap.matches.some((m) => m.category_id === c.id && fs.some((f) => f.id === m.field_id)));
+          return (
+            <div key={venue} className="card">
+              <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+                <Icon name="pin" className="size-5 text-gold" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold">{venue || 'Tereni'}</div>
+                  {cats.length > 0 && <div className="text-[12px] text-white/55">{cats.map((c) => c.name).join(', ')} godište</div>}
+                </div>
+              </div>
+              {fs.map((f) => (
+                <div key={f.id} className="flex items-center gap-3 px-4 py-2 text-[14px]">
+                  <span className="flex-1 text-white/80">{f.name}</span>
+                  {f.maps_url && <a href={f.maps_url} target="_blank" rel="noreferrer" className="text-[13px] font-bold text-gold">Karta</a>}
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
 
       <SectionTitle>Pravila</SectionTitle>

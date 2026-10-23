@@ -20,7 +20,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Demo PIN-ovi: **9000** (organizator), **1111** (Teren 1), **2222** (Teren 2).
+Demo PIN-ovi: **9000** (organizator), a tereni redom **1001** do **1011** (popis je na ekranu Prijava).
 U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezultate pa se vide tablice i ždrijeb. Gumb „Vrati početno stanje” sve vraća.
 
 ## 2. Postavljanje (Supabase + Vercel)
@@ -29,13 +29,11 @@ U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezu
 
 1. Na https://supabase.com napravi novi projekt (regija **Frankfurt**, `eu-central-1`).
 2. **SQL Editor → New query**: zalijepi cijeli `supabase/schema.sql` i klikni **Run**.
-3. Opet **New query**: zalijepi `supabase/seed.sql` (Cataleya Cup: momčadi, skupine, raspored, četvrtfinale) i klikni **Run**.
-4. Postavi PIN-ove. Na dnu `seed.sql` piše ID turnira i terena. U **SQL Editoru** upiši svoje PIN-ove umjesto `XXXX`:
+3. Opet **New query**: zalijepi `supabase/seed.sql` (Cataleya Cup: 4 godišta, momčadi, skupine, raspored, osmine A i B turnira) i klikni **Run**.
+4. Postavi PIN-ove. Na dnu `seed.sql` su gotove naredbe za glavni PIN i svih 11 terena. Kopiraj ih u novi upit, makni `-- ` na početku retka, umjesto `XXXX` upiši PIN i klikni **Run**. Na primjer:
 
    ```sql
-   select set_pin('e0bd4789-db5e-406e-817b-520be1fc82fe', null, 'XXXX');                                    -- glavni PIN
-   select set_pin('e0bd4789-db5e-406e-817b-520be1fc82fe', '9c7f2e30-86bd-4eca-8d87-e6e159b3cae7', 'XXXX');  -- Teren 1
-   select set_pin('e0bd4789-db5e-406e-817b-520be1fc82fe', '531568b7-4758-4946-87ec-cfd113ed015e', 'XXXX');  -- Teren 2
+   select set_pin('e0bd4789-db5e-406e-817b-520be1fc82fe', null, 'XXXX');  -- glavni PIN
    ```
 
    PIN ima 4 do 8 znamenki, a svi PIN-ovi u turniru moraju biti različiti. Kasnije ih organizator mijenja u aplikaciji.
@@ -105,12 +103,14 @@ Za svaku utakmicu nastavka upišeš **oznaku** (npr. `ČF1`) i **tko ulazi**:
 |---|---|
 | `1A` | 1. u skupini A |
 | `2B` | 2. u skupini B |
+| `2#6` | 6. najbolji drugoplasirani iz svih skupina |
+| `4#2` | 2. najbolji četvrtoplasirani |
 | `W:ČF1` | pobjednik utakmice ČF1 |
 | `L:PF1` | poraženi u utakmici PF1 |
 
 U finalu upiši i **„Pobjednik osvaja mjesto” 1** i **„Poraženi” 2**; u utakmici za 3. mjesto 3 i 4, i tako dalje. Iz toga nastaje konačni poredak.
 
-Četvrtfinale iz zadatka (1A–2B, 1B–2A, 1C–2D, 1D–2C) već je upisano, bez termina i terena. Kad dobiješ raspored za nedjelju, upiši termin i teren svakoj utakmici. Gumb **„Dodaj polufinala, za 3. mjesto i finale”** doda PF1 (W:ČF1–W:ČF2), PF2 (W:ČF3–W:ČF4), utakmicu za 3. mjesto i finale. Ako pravila turnira kažu drukčije, uredi ili obriši te utakmice.
+Za 2016., 2017. i 2018. već su upisane subotnje osmine A i B turnira iz rasporeda (OS1–OS8 i U1–U8), s terminima i terenima. Za 2019. upisano je četvrtfinale A turnira (1A–2B, 1B–2A, 1C–2D, 1D–2C) bez termina; provjeri parove kad dobiješ nedjeljni raspored. Nedjeljne krugove dodaješ sam: npr. četvrtfinale `W:OS1` – `W:OS2`, s turnirom A ili B. Kad dobiješ raspored za nedjelju, upiši termin i teren svakoj utakmici. Gumb **„Dodaj polufinala, za 3. mjesto i finale”** doda PF1 (W:ČF1–W:ČF2), PF2 (W:ČF3–W:ČF4), utakmicu za 3. mjesto i finale. Ako pravila turnira kažu drukčije, uredi ili obriši te utakmice.
 
 **Što se događa samo:**
 - Kad su sve utakmice skupine završene, momčadi se upišu u sljedeću fazu.
@@ -120,11 +120,13 @@ U finalu upiši i **„Pobjednik osvaja mjesto” 1** i **„Poraženi” 2**; u
 
 **Ručna promjena:** ako u utakmici nastavka ručno promijeniš momčad, utakmica se označi kao „ručno” i automatika je više ne dira. Kvačica „Ručno određene momčadi” to uključuje i isključuje.
 
+**Najbolji drugoplasirani:** u Tablicama je poredak svih drugoplasiranih (i četvrtoplasiranih) s oznakom tko ide u A, a tko u B turnir. Uspoređuju se bodovi, gol-razlika, postignuti i primljeni golovi te kartoni. Ako su dvije momčadi i tada potpuno jednake, mjesto u osmini ostaje prazno: odredi momčad ručno u utakmici (Nastavak → utakmica → Momčad).
+
 **Jednake momčadi:** ako nijedan kriterij ne razdvoji momčadi, u tablici se pojavi `*`, a mjesto u nastavku ostaje prazno. U kartici **Nastavak → Ždrijeb kod izjednačenja** upiši redoslijed iz ždrijeba (1 = bolji).
 
 ### Kriteriji kod jednakih bodova
 
-Zadani redoslijed: **međusobni susret → gol-razlika → više postignutih golova → ždrijeb**. Mijenja se u kartici **Turnir** (strelice gore i dolje, ✕ miče, + dodaje).
+Prema propozicijama: **bodovi → međusobni susret → gol-razlika → više postignutih golova → manje primljenih golova → manje žutih/crvenih kartona → ždrijeb**. Kartoni se broje ukupno (žuti i crveni zajedno). Mijenja se u kartici **Turnir** (strelice gore i dolje, ✕ miče, + dodaje).
 
 - **Međusobni susret:** bodovi samo iz utakmica između izjednačenih momčadi. Kod tri ili više momčadi to je mala tablica samo njihovih međusobnih utakmica.
 - Ako kriterij razdvoji samo dio momčadi, za one koje su i dalje izjednačene gleda se sljedeći kriterij.
@@ -148,8 +150,9 @@ Ako pravila turnira traže drukčije, javi: to je jedna funkcija u `src/lib/stan
 2. Vidiš samo utakmice na svom terenu, sljedeća je na vrhu. Dodirni utakmicu.
 3. **Počni utakmicu** kad sudac zazvižda. Gledatelji vide „Uživo”.
 4. Za svaki gol dodirni veliki žuti **+** ispod momčadi. Za pogrešku dodirni **−**.
-5. **Kraj utakmice** na kraju. Ako je neriješeno a pravila traže jedanaesterce, prije kraja dodirni **Jedanaesterci** i upiši ih.
-6. Pogriješio si nakon kraja? **Ispravi rezultat**.
+5. Kartone upiši ispod rezultata (žuti i crveni, za svaku momčad). Oni odlučuju kod jednakih bodova.
+6. **Kraj utakmice** na kraju. U osmini i dalje neriješeno se ne može završiti dok ne upišeš jedanaesterce.
+7. Pogriješio si nakon kraja? **Ispravi rezultat**.
 
 Bez signala: rezultat ostaje spremljen na mobitelu i pošalje se sam kad se veza vrati (piše žutom porukom).
 

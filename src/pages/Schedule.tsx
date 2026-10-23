@@ -30,7 +30,7 @@ export function Schedule() {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <Select value={field} onChange={setField} label="Svi tereni" options={snap.fields.map((f) => [f.id, f.name])} />
+        <Select value={field} onChange={setField} label="Svi tereni" options={snap.fields.filter((f) => all.some((m) => m.field_id === f.id)).map((f) => [f.id, f.name])} />
         <Select value={team} onChange={setTeam} label="Sve momčadi" options={teams.map((t) => [t.id, t.name])} />
       </div>
 

@@ -16,7 +16,7 @@ export function PinsTab() {
         <b>Glavni PIN</b> otvara sve. <b>PIN terena</b> otvara samo upis rezultata za utakmice na tom terenu.
         PIN se nigdje ne prikazuje nakon spremanja; ako ga zaboraviš, postavi novi.
       </p>
-      {source.mode === 'demo' && <p className="mt-2 text-[12px] text-bloom-cyan">Demo: glavni 9000, Teren 1 1111, Teren 2 2222.</p>}
+      {source.mode === 'demo' && <p className="mt-2 text-[12px] text-bloom-cyan">Demo: glavni PIN 9000, tereni redom 1001, 1002, …</p>}
 
       <SectionTitle>Glavni PIN</SectionTitle>
       <PinRow fieldId={null} label="Organizator" />
@@ -69,16 +69,17 @@ function PinRow({ fieldId, label, bare = false }: { fieldId: string | null; labe
 
 function FieldEditor({ field, onClose }: { field: FieldRow | null; onClose(): void }) {
   const { snap } = useTournament();
-  const [f, setF] = useState<Omit<FieldRow, 'tournament_id'>>(field ?? { id: newId(), name: `Teren ${snap.fields.length + 1}`, maps_url: null, sort_order: snap.fields.length + 1 });
+  const [f, setF] = useState<Omit<FieldRow, 'tournament_id'>>(field ?? { id: newId(), name: `Teren ${snap.fields.length + 1}`, venue: null, maps_url: null, sort_order: snap.fields.length + 1 });
   const { save, status, busy } = useSave();
   return (
     <Sheet title={field ? 'Teren' : 'Novi teren'} onClose={onClose}>
       <form className="space-y-3" onSubmit={async (e) => {
         e.preventDefault();
-        const { id, name, maps_url, sort_order } = f;
-        if (await save([{ type: 'upsert', table: 'fields', row: { id, name, maps_url, sort_order } }])) onClose();
+        const { id, name, venue, maps_url, sort_order } = f;
+        if (await save([{ type: 'upsert', table: 'fields', row: { id, name, venue, maps_url, sort_order } }])) onClose();
       }}>
         <Field label="Naziv"><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
+        <Field label="Lokacija" hint="npr. Arbanasi, SC Višnjik"><Input value={f.venue ?? ''} onChange={(e) => setF({ ...f, venue: e.target.value || null })} /></Field>
         <Field label="Link na Google Maps" hint="U Google Mapsu: Dijeli → Kopiraj link">
           <Input type="url" value={f.maps_url ?? ''} onChange={(e) => setF({ ...f, maps_url: e.target.value || null })} placeholder="https://maps.app.goo.gl/…" />
         </Field>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeGroupTable, teamAtPosition, type TableSettings } from './standings';
+import { computeGroupTable, nthAcrossGroups, rankAcrossGroups, teamAtPosition, type TableSettings } from './standings';
 import type { Match, Tiebreaker } from './types';
 import { blankMatch } from '../data/seed';
 
@@ -163,5 +163,48 @@ describe('tablica skupine', () => {
     const t = computeGroupTable(teams('A', 'B', 'C'), [played('A', 'B', 1, 0), played('A', 'C', 1, 0), cancelled], settings());
     expect(t.complete).toBe(true);
     expect(teamAtPosition(t, 1)).toBe('A');
+  });
+});
+
+describe('kartoni i najbolji drugoplasirani (propozicije Cataleya Cupa)', () => {
+  const cataleya = settings(['head_to_head', 'goal_difference', 'goals_for', 'fewer_goals_against', 'fewer_cards', 'lot']);
+
+  it('momčad s manje kartona je ispred', () => {
+    const m = { ...played('A', 'B', 0, 0), home_yellow: 1, away_yellow: 3 };
+    const t = computeGroupTable(teams('A', 'B'), [m], cataleya);
+    expect(order(t)).toEqual(['A', 'B']);
+    expect(t.needsLot).toBe(false);
+  });
+
+  it('poredak drugoplasiranih iz svih skupina: bodovi, pa gol-razlika, golovi, primljeni', () => {
+    const group = (name: string, results: [string, string, number, number][]) => {
+      const ids = [...new Set(results.flatMap(([h, a]) => [h, a]))];
+      return { groupName: name, table: computeGroupTable(teams(...ids), results.map(([h, a, x, y]) => played(h, a, x, y)), cataleya) };
+    };
+    // Tri skupine po 3 momčadi; drugoplasirani imaju po 3 boda, razlikuju se po golovima.
+    const gA = group('A', [['A1', 'A2', 1, 0], ['A1', 'A3', 1, 0], ['A2', 'A3', 3, 0]]); // A2: 3 b, GR +2
+    const gB = group('B', [['B1', 'B2', 1, 0], ['B1', 'B3', 1, 0], ['B2', 'B3', 1, 0]]); // B2: 3 b, GR 0
+    const gC = group('C', [['C1', 'C2', 1, 0], ['C1', 'C3', 1, 0], ['C2', 'C3', 2, 1]]); // C2: 3 b, GR 0, golovi 2
+    const cross = rankAcrossGroups([gA, gB, gC], 2, cataleya);
+    expect(cross.complete).toBe(true);
+    expect(cross.rows.map((r) => r.teamId)).toEqual(['A2', 'C2', 'B2']);
+    expect(nthAcrossGroups(cross, 1)).toBe('A2');
+    expect(nthAcrossGroups(cross, 3)).toBe('B2');
+  });
+
+  it('nema poretka dok sve skupine nisu gotove', () => {
+    const done = { groupName: 'A', table: computeGroupTable(teams('A1', 'A2'), [played('A1', 'A2', 1, 0)], cataleya) };
+    const open = { groupName: 'B', table: computeGroupTable(teams('B1', 'B2'), [played('B1', 'B2', 1, 0, 'live')], cataleya) };
+    const cross = rankAcrossGroups([done, open], 2, cataleya);
+    expect(cross.complete).toBe(false);
+    expect(nthAcrossGroups(cross, 1)).toBeNull();
+  });
+
+  it('potpuno jednaki drugoplasirani dijele mjesto i organizator odlučuje', () => {
+    const g = (n: string) => ({ groupName: n, table: computeGroupTable(teams(`${n}1`, `${n}2`), [played(`${n}1`, `${n}2`, 1, 0)], cataleya) });
+    const cross = rankAcrossGroups([g('A'), g('B')], 2, cataleya);
+    expect(cross.rows.map((r) => r.crossRank)).toEqual([1, 1]);
+    expect(nthAcrossGroups(cross, 1)).toBeNull();
+    expect(nthAcrossGroups(cross, 2)).toBeNull();
   });
 });

@@ -13,6 +13,10 @@ export interface ScorePatch {
   home_penalties: number | null;
   away_penalties: number | null;
   status: MatchStatus;
+  home_yellow?: number;
+  away_yellow?: number;
+  home_red?: number;
+  away_red?: number;
 }
 
 export type Mutation =
@@ -32,13 +36,14 @@ const EDITABLE: Record<TableName, string[]> = {
     'color_secondary', 'description', 'rules', 'points_win', 'points_draw', 'points_loss', 'tiebreakers',
     'scorers_enabled', 'is_published'],
   categories: ['id', 'name', 'birth_year', 'match_minutes', 'players_on_field', 'sort_order'],
-  fields: ['id', 'name', 'maps_url', 'sort_order'],
+  fields: ['id', 'name', 'venue', 'maps_url', 'sort_order'],
   teams: ['id', 'category_id', 'name', 'short_name', 'logo_path'],
   groups: ['id', 'category_id', 'name', 'sort_order'],
   group_teams: ['category_id', 'group_id', 'team_id', 'lot_rank'],
   matches: ['id', 'category_id', 'stage', 'group_id', 'code', 'label', 'home_team_id', 'away_team_id',
     'home_source', 'away_source', 'field_id', 'starts_at', 'duration_minutes', 'home_score', 'away_score',
-    'home_penalties', 'away_penalties', 'status', 'winner_place', 'loser_place', 'teams_locked'],
+    'home_penalties', 'away_penalties', 'status', 'home_yellow', 'away_yellow', 'home_red', 'away_red', 'bracket',
+    'winner_place', 'loser_place', 'teams_locked'],
 };
 
 export class MutationError extends Error {
@@ -59,6 +64,9 @@ export function validateScorePatch(p: ScorePatch): void {
   if ((p.home_penalties === null) !== (p.away_penalties === null)) throw new MutationError('Upiši jedanaesterce za obje momčadi.');
   if (p.status === 'finished' && p.home_score === null) throw new MutationError('Završena utakmica mora imati rezultat.');
   if (!['scheduled', 'live', 'finished', 'cancelled'].includes(p.status)) throw new MutationError('Nepoznat status.');
+  for (const c of [p.home_yellow, p.away_yellow, p.home_red, p.away_red]) {
+    if (c !== undefined && !(Number.isInteger(c) && c >= 0 && c < 30)) throw new MutationError('Broj kartona nije ispravan.');
+  }
 }
 
 /**
@@ -72,8 +80,9 @@ export function authorize(m: Mutation, actor: Actor, match?: Pick<Match, 'field_
       throw new MutationError('Ova utakmica nije na tvom terenu.', 403);
     }
     validateScorePatch(m.patch);
-    const { home_score, away_score, home_penalties, away_penalties, status } = m.patch;
-    return { type: 'score', matchId: m.matchId, patch: { home_score, away_score, home_penalties, away_penalties, status } };
+    const { home_score, away_score, home_penalties, away_penalties, status, home_yellow, away_yellow, home_red, away_red } = m.patch;
+    const cards = Object.fromEntries(Object.entries({ home_yellow, away_yellow, home_red, away_red }).filter(([, v]) => v !== undefined));
+    return { type: 'score', matchId: m.matchId, patch: { home_score, away_score, home_penalties, away_penalties, status, ...cards } };
   }
   if (actor.role !== 'admin') throw new MutationError('Za ovo treba glavni PIN.', 403);
   if (m.type === 'setPin') {

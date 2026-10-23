@@ -50,7 +50,8 @@ export function matchPhase(s: Snapshot, m: Match): string {
     const g = s.groups.find((x) => x.id === m.group_id);
     return g ? `Skupina ${g.name}` : 'Skupina';
   }
-  return m.label ?? (m.code ? `${STAGE_LABEL[m.stage]} · ${m.code}` : STAGE_LABEL[m.stage]);
+  const base = m.label ?? (m.bracket ? `${m.bracket} turnir · ${STAGE_LABEL[m.stage].toLowerCase()}` : STAGE_LABEL[m.stage]);
+  return m.code ? `${base} · ${m.code}` : base;
 }
 
 export function byTime(a: Match, b: Match): number {

@@ -11,6 +11,7 @@ const TB_LABEL: Record<Tiebreaker, string> = {
   goals_for: 'Više postignutih golova',
   wins: 'Više pobjeda',
   fewer_goals_against: 'Manje primljenih golova',
+  fewer_cards: 'Manje žutih/crvenih kartona',
   lot: 'Ždrijeb (organizator ručno)',
 };
 

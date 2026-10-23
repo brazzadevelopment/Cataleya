@@ -1,12 +1,14 @@
-import { computeGroupTable, teamAtPosition, type GroupTable, type TableSettings } from './standings.js';
+import { computeGroupTable, nthAcrossGroups, rankAcrossGroups, teamAtPosition, type GroupTable, type TableSettings } from './standings.js';
 import type { Group, GroupTeam, Match } from './types.js';
 
 // ---------------------------------------------------------------------
-// Mjesta u utakmicama sljedeće faze: '1A', 'W:ČF1', 'L:PF2'
+// Mjesta u utakmicama sljedeće faze: '1A', '2#6', 'W:ČF1', 'L:PF2'
 // ---------------------------------------------------------------------
 
 export type Source =
   | { kind: 'group'; position: number; group: string }
+  /** N-ta najbolja momčad s istog mjesta iz svih skupina, npr. 6. najbolji drugoplasirani. */
+  | { kind: 'best'; position: number; nth: number }
   | { kind: 'winner'; code: string }
   | { kind: 'loser'; code: string };
 
@@ -15,15 +17,21 @@ export function parseSource(raw: string | null | undefined): Source | null {
   const s = raw.trim();
   const g = /^([1-9][0-9]?)\s*\.?\s*([A-Z]{1,2})$/.exec(s.toUpperCase());
   if (g) return { kind: 'group', position: Number(g[1]), group: g[2] };
+  const b = /^([1-9])\s*#\s*([1-9][0-9]?)$/.exec(s);
+  if (b) return { kind: 'best', position: Number(b[1]), nth: Number(b[2]) };
   const wl = /^([WL]):(\S{1,12})$/.exec(s);
   if (wl) return { kind: wl[1] === 'W' ? 'winner' : 'loser', code: wl[2] };
   return null;
 }
 
+const PLACED = ['', 'prvoplasirani', 'drugoplasirani', 'trećeplasirani', 'četvrtoplasirani', 'petoplasirani', 'šestoplasirani'];
+
 export function formatSource(src: Source): string {
   return src.kind === 'group'
     ? `${src.position}. ${src.group}`
-    : src.kind === 'winner'
+    : src.kind === 'best'
+      ? `${src.nth}. ${PLACED[src.position] ?? `${src.position}. mjesto`}`
+      : src.kind === 'winner'
       ? `Pobjednik ${src.code}`
       : `Poraženi ${src.code}`;
 }
@@ -94,11 +102,15 @@ export function groupTables(data: Pick<CategoryData, 'groups' | 'groupTeams' | '
   return tables;
 }
 
-function resolve(src: Source | null, tables: Map<string, GroupTable>, byCode: Map<string, Match>): string | null {
+function resolve(src: Source | null, tables: Map<string, GroupTable>, byCode: Map<string, Match>, settings: TableSettings): string | null {
   if (!src) return null;
   if (src.kind === 'group') {
     const table = tables.get(src.group);
     return table ? teamAtPosition(table, src.position) : null;
+  }
+  if (src.kind === 'best') {
+    const cross = rankAcrossGroups([...tables].map(([groupName, table]) => ({ groupName, table })), src.position, settings);
+    return nthAcrossGroups(cross, src.nth);
   }
   const m = byCode.get(src.code);
   const outcome = m ? matchOutcome(m) : null;
@@ -129,8 +141,8 @@ export function computeAdvancement(data: CategoryData): TeamAssignment[] {
     for (const m of current.values()) {
       if (m.teams_locked || m.status !== 'scheduled') continue;
       if (!m.home_source && !m.away_source) continue;
-      const home = m.home_source ? resolve(parseSource(m.home_source), tables, byCode) : m.home_team_id;
-      const away = m.away_source ? resolve(parseSource(m.away_source), tables, byCode) : m.away_team_id;
+      const home = m.home_source ? resolve(parseSource(m.home_source), tables, byCode, data.settings) : m.home_team_id;
+      const away = m.away_source ? resolve(parseSource(m.away_source), tables, byCode, data.settings) : m.away_team_id;
       if (home !== m.home_team_id || away !== m.away_team_id) {
         m.home_team_id = home;
         m.away_team_id = away;

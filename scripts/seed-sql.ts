@@ -46,8 +46,9 @@ sql += insert('matches', s.matches.map((m) => ({
   ...m, id: uuid(m.id), tournament_id: T, category_id: uuid(m.category_id), group_id: uuid(m.group_id),
   home_team_id: uuid(m.home_team_id), away_team_id: uuid(m.away_team_id), field_id: uuid(m.field_id),
 })));
-sql += `commit;\n\n-- Turnir: ${T}\n`;
-for (const f of s.fields) sql += `-- ${f.name}: ${uuid(f.id)}\n`;
+sql += `commit;\n\n-- PIN-ovi: zamijeni XXXX svojim PIN-om (4 do 8 znamenki, svi različiti) i pokreni.\n`;
+sql += `-- select set_pin('${T}', null, 'XXXX');  -- glavni PIN (organizator)\n`;
+for (const f of s.fields) sql += `-- select set_pin('${T}', '${uuid(f.id)}', 'XXXX');  -- ${f.name}\n`;
 
 writeFileSync(new URL('../supabase/seed.sql', import.meta.url), sql);
 console.log(`supabase/seed.sql: ${s.teams.length} momčadi, ${s.matches.length} utakmica`);

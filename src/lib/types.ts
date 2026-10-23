@@ -6,6 +6,7 @@ export type Tiebreaker =
   | 'goals_for'
   | 'wins'
   | 'fewer_goals_against'
+  | 'fewer_cards'
   | 'lot';
 
 export type MatchStage =
@@ -56,6 +57,7 @@ export interface Field {
   id: string;
   tournament_id: string;
   name: string;
+  venue: string | null;
   maps_url: string | null;
   sort_order: number;
 }
@@ -105,6 +107,12 @@ export interface Match {
   home_penalties: number | null;
   away_penalties: number | null;
   status: MatchStatus;
+  home_yellow: number;
+  away_yellow: number;
+  home_red: number;
+  away_red: number;
+  /** Ždrijeb kojem utakmica pripada, npr. 'A' ili 'B' turnir. */
+  bracket: string | null;
   winner_place: number | null;
   loser_place: number | null;
   teams_locked: boolean;

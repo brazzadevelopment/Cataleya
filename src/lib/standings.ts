@@ -18,6 +18,8 @@ export interface TableRow {
   goalsAgainst: number;
   goalDiff: number;
   points: number;
+  /** Žuti i crveni kartoni ukupno. */
+  cards: number;
   /** Mjesto u skupini (1 = prvo). Momčadi koje nisu razdvojene dijele mjesto. */
   rank: number;
   /** Kriteriji nisu razdvojili ovu momčad od druge; organizator treba odrediti redoslijed. */
@@ -40,10 +42,11 @@ interface Totals {
   goalsFor: number;
   goalsAgainst: number;
   points: number;
+  cards: number;
 }
 
 const emptyTotals = (): Totals => ({
-  played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0,
+  played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0, cards: 0,
 });
 
 function isCounted(m: Match): m is Match & { home_team_id: string; away_team_id: string; home_score: number; away_score: number } {
@@ -60,6 +63,8 @@ function totalsFor(teamIds: string[], matches: Match[], s: TableSettings): Map<s
     const h = out.get(m.home_team_id)!;
     const a = out.get(m.away_team_id)!;
     h.played++; a.played++;
+    h.cards += (m.home_yellow ?? 0) + (m.home_red ?? 0);
+    a.cards += (m.away_yellow ?? 0) + (m.away_red ?? 0);
     h.goalsFor += m.home_score; h.goalsAgainst += m.away_score;
     a.goalsFor += m.away_score; a.goalsAgainst += m.home_score;
     if (m.home_score > m.away_score) {
@@ -111,6 +116,9 @@ function breakTie(
       break;
     case 'fewer_goals_against':
       key = (id) => -overall.get(id)!.goalsAgainst;
+      break;
+    case 'fewer_cards':
+      key = (id) => -overall.get(id)!.cards;
       break;
     case 'lot':
       // Bez upisanog ždrijeba nema razdvajanja.
@@ -180,4 +188,63 @@ export function teamAtPosition(table: GroupTable, position: number): string | nu
   if (!table.complete) return null;
   const atRank = table.rows.filter((r) => r.rank === position);
   return atRank.length === 1 ? atRank[0].teamId : null;
+}
+
+/** Momčad s istog mjesta iz različitih skupina, npr. svi drugoplasirani. */
+export interface CrossRow extends TableRow {
+  groupName: string;
+  /** Mjesto među momčadima s istog mjesta (1 = najbolja). Izjednačene dijele mjesto. */
+  crossRank: number;
+}
+
+export interface CrossTable {
+  rows: CrossRow[];
+  /** Sve skupine su gotove i svako mjesto je jasno. */
+  complete: boolean;
+}
+
+/**
+ * Poredak momčadi s istog mjesta iz svih skupina (npr. "6 najboljih
+ * drugoplasiranih"). Uspoređuju se bodovi pa kriteriji iz postavki,
+ * bez međusobnog susreta (te momčadi nisu igrale jedna protiv druge)
+ * i bez ždrijeba, koji organizator tada određuje ručno.
+ */
+export function rankAcrossGroups(
+  tables: { groupName: string; table: GroupTable }[],
+  position: number,
+  settings: TableSettings,
+): CrossTable {
+  const rows: Omit<CrossRow, 'crossRank'>[] = [];
+  let complete = tables.length > 0;
+  for (const { groupName, table } of tables) {
+    const atRank = table.rows.filter((r) => r.rank === position);
+    if (!table.complete || atRank.length !== 1) complete = false;
+    if (atRank.length === 1) rows.push({ ...atRank[0], groupName });
+  }
+  const keys: ((r: TableRow) => number)[] = [(r) => r.points];
+  for (const c of settings.tiebreakers) {
+    if (c === 'goal_difference') keys.push((r) => r.goalDiff);
+    else if (c === 'goals_for') keys.push((r) => r.goalsFor);
+    else if (c === 'wins') keys.push((r) => r.won);
+    else if (c === 'fewer_goals_against') keys.push((r) => -r.goalsAgainst);
+    else if (c === 'fewer_cards') keys.push((r) => -r.cards);
+  }
+  const cmp = (a: TableRow, b: TableRow) => {
+    for (const k of keys) if (k(a) !== k(b)) return k(b) - k(a);
+    return 0;
+  };
+  rows.sort((a, b) => cmp(a, b) || a.groupName.localeCompare(b.groupName));
+  const ranked: CrossRow[] = [];
+  rows.forEach((r, i) => {
+    const prev = ranked[i - 1];
+    ranked.push({ ...r, crossRank: prev && cmp(prev, r) === 0 ? prev.crossRank : i + 1 });
+  });
+  return { rows: ranked, complete };
+}
+
+/** N-ta najbolja momčad s istog mjesta, ako je poredak gotov i jasan. */
+export function nthAcrossGroups(cross: CrossTable, nth: number): string | null {
+  if (!cross.complete) return null;
+  const at = cross.rows.filter((r) => r.crossRank === nth);
+  return at.length === 1 ? at[0].teamId : null;
 }

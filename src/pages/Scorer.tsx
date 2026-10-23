@@ -30,7 +30,7 @@ export function ScorerList({ embedded = false }: { embedded?: boolean }) {
         </button>
       </div>
       {session.role === 'admin' && (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {snap.fields.map((f) => <Chip key={f.id} active={f.id === fieldId} onClick={() => setField(f.id)}>{f.name}</Chip>)}
           {!embedded && <Link to={`${base}/admin`} className="ml-auto self-center text-[12px] font-bold text-gold">Uređivanje →</Link>}
         </div>
@@ -85,7 +85,10 @@ export function ScoreEntry() {
 
   useEffect(() => {
     if (m) {
-      setDraft({ home_score: m.home_score, away_score: m.away_score, home_penalties: m.home_penalties, away_penalties: m.away_penalties, status: m.status });
+      setDraft({
+        home_score: m.home_score, away_score: m.away_score, home_penalties: m.home_penalties, away_penalties: m.away_penalties, status: m.status,
+        home_yellow: m.home_yellow ?? 0, away_yellow: m.away_yellow ?? 0, home_red: m.home_red ?? 0, away_red: m.away_red ?? 0,
+      });
       if (m.home_penalties != null) setShowPens(true);
     }
     // Samo kod otvaranja; kasnije promjene stižu kroz save().
@@ -116,6 +119,14 @@ export function ScoreEntry() {
   const away = sideLabel(snap, m, 'away');
   const started = draft.status === 'live' || draft.status === 'finished';
   const level = draft.home_score != null && draft.home_score === draft.away_score;
+  const knockout = m.stage !== 'group';
+  // Propozicije: neriješeno u drugom dijelu natjecanja odlučuju jedanaesterci.
+  const needsPens = knockout && level && (draft.home_penalties == null || draft.home_penalties === draft.away_penalties);
+
+  const card = (side: 'home' | 'away', color: 'yellow' | 'red', delta: number) => {
+    const k = `${side}_${color}` as const;
+    void save({ ...draft, [k]: Math.max(0, Math.min(29, (draft[k] ?? 0) + delta)) });
+  };
 
   const bump = (side: 'home' | 'away', key: 'score' | 'penalties', delta: number) => {
     const k = `${side}_${key}` as const;
@@ -166,9 +177,31 @@ export function ScoreEntry() {
         <p className={`mt-3 text-center text-[13px] font-bold ${msg.tone === 'ok' ? 'text-[#7ee2a8]' : msg.tone === 'warn' ? 'text-gold' : 'text-[#ff8197]'}`}>{msg.text}</p>
       )}
 
-      {started && level && (
+      {started && (
         <div className="card mt-4 p-3">
-          {!showPens ? (
+          <div className="mb-2 text-center text-[12px] font-extrabold tracking-wider text-white/60 uppercase">Kartoni</div>
+          <div className="grid grid-cols-2 gap-3">
+            {(['home', 'away'] as const).map((side) => (
+              <div key={side} className="space-y-2">
+                {(['yellow', 'red'] as const).map((color) => (
+                  <div key={color} className="flex items-center justify-between gap-1">
+                    <button type="button" onClick={() => card(side, color, -1)} disabled={!draft[`${side}_${color}`]} className="grid size-10 place-items-center rounded-xl bg-white/8 ring-1 ring-white/12 disabled:opacity-30" aria-label="Makni karton"><Icon name="minus" className="size-4" /></button>
+                    <span className="flex items-center gap-1.5">
+                      <span className={`inline-block h-5 w-3.5 rounded-[3px] ${color === 'yellow' ? 'bg-[#ffd400]' : 'bg-live'}`} />
+                      <span className="w-5 text-center text-lg font-black tabular-nums">{draft[`${side}_${color}`] ?? 0}</span>
+                    </span>
+                    <button type="button" onClick={() => card(side, color, 1)} className="grid size-10 place-items-center rounded-xl bg-white/8 ring-1 ring-white/12" aria-label={color === 'yellow' ? 'Žuti karton' : 'Crveni karton'}><Icon name="plus" className="size-4" /></button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {started && level && knockout && (
+        <div className="card mt-4 p-3">
+          {!showPens && !needsPens ? (
             <Button variant="ghost" className="w-full" onClick={() => setShowPens(true)}>Jedanaesterci</Button>
           ) : (
             <>
@@ -196,8 +229,11 @@ export function ScoreEntry() {
             Počni utakmicu
           </Button>
         )}
+        {draft.status === 'live' && needsPens && (
+          <p className="text-center text-[13px] font-bold text-gold">Neriješeno: upiši jedanaesterce, pa završi utakmicu.</p>
+        )}
         {draft.status === 'live' && (
-          <Button onClick={() => save({ ...draft, status: 'finished' })} className="h-14 text-base">
+          <Button onClick={() => save({ ...draft, status: 'finished' })} disabled={needsPens} className="h-14 text-base">
             <Icon name="check" className="size-5" /> Kraj utakmice
           </Button>
         )}

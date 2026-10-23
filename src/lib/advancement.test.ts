@@ -21,8 +21,9 @@ function settle(data: CategoryData): CategoryData {
 
 function demoCategory(): CategoryData {
   const s = demoSnapshot();
+  const c = (x: { category_id: string }) => x.category_id === 'u2019';
   return {
-    groups: s.groups, groupTeams: s.groupTeams, matches: s.matches,
+    groups: s.groups.filter(c), groupTeams: s.groupTeams.filter(c), matches: s.matches.filter(c),
     settings: { points_win: 3, points_draw: 1, points_loss: 0, tiebreakers: ['head_to_head', 'goal_difference', 'goals_for', 'lot'] },
   };
 }
@@ -46,6 +47,7 @@ describe('oznake mjesta', () => {
     expect(parseSource('2. b')).toEqual({ kind: 'group', position: 2, group: 'B' });
     expect(parseSource('W:ČF1')).toEqual({ kind: 'winner', code: 'ČF1' });
     expect(parseSource('L:PF2')).toEqual({ kind: 'loser', code: 'PF2' });
+    expect(parseSource('2#6')).toEqual({ kind: 'best', position: 2, nth: 6 });
     expect(parseSource('nešto')).toBeNull();
   });
 
@@ -53,6 +55,8 @@ describe('oznake mjesta', () => {
     expect(sourceLabel('1A')).toBe('1. A');
     expect(sourceLabel('W:ČF1')).toBe('Pobjednik ČF1');
     expect(sourceLabel('L:PF2')).toBe('Poraženi PF2');
+    expect(sourceLabel('2#6')).toBe('6. drugoplasirani');
+    expect(sourceLabel('4#2')).toBe('2. četvrtoplasirani');
   });
 });
 
@@ -87,33 +91,33 @@ describe('automatsko upisivanje u sljedeću fazu', () => {
     let data = demoCategory();
     // Skupina A: Zagreb pobjeđuje sve, Arbanasi drugi.
     data = playGroup(data, 'A', {
-      'tm-nk-zagreb|tm-nk-arbanasi': [3, 0],
-      'tm-nk-varazdin-narancasti|tm-nk-zadarnova-bijeli': [0, 1],
-      'tm-nk-varazdin-narancasti|tm-nk-arbanasi': [0, 2],
-      'tm-nk-zagreb|tm-nk-zadarnova-bijeli': [2, 0],
-      'tm-nk-varazdin-narancasti|tm-nk-zagreb': [0, 4],
-      'tm-nk-arbanasi|tm-nk-zadarnova-bijeli': [2, 0],
+      'tm-u2019-nk-zagreb|tm-u2019-nk-arbanasi': [3, 0],
+      'tm-u2019-nk-varazdin-narancasti|tm-u2019-nk-zadarnova-bijeli': [0, 1],
+      'tm-u2019-nk-varazdin-narancasti|tm-u2019-nk-arbanasi': [0, 2],
+      'tm-u2019-nk-zagreb|tm-u2019-nk-zadarnova-bijeli': [2, 0],
+      'tm-u2019-nk-varazdin-narancasti|tm-u2019-nk-zagreb': [0, 4],
+      'tm-u2019-nk-arbanasi|tm-u2019-nk-zadarnova-bijeli': [2, 0],
     });
     // A je gotova, B nije: upišu se samo mjesta iz skupine A.
     expect(computeAdvancement(data)).toEqual([
-      { id: 'qf-1', home_team_id: 'tm-nk-zagreb', away_team_id: null },
-      { id: 'qf-2', home_team_id: null, away_team_id: 'tm-nk-arbanasi' },
+      { id: 'u2019-qf1', home_team_id: 'tm-u2019-nk-zagreb', away_team_id: null },
+      { id: 'u2019-qf2', home_team_id: null, away_team_id: 'tm-u2019-nk-arbanasi' },
     ]);
 
     data = playGroup(data, 'B', {
-      'tm-nk-inker|tm-hnk-zadar': [0, 2],
-      'tm-nk-lokomotiva-plavi|tm-nsk-nova-zora': [0, 1],
-      'tm-nk-lokomotiva-plavi|tm-hnk-zadar': [0, 3],
-      'tm-nk-inker|tm-nsk-nova-zora': [0, 1],
-      'tm-nk-lokomotiva-plavi|tm-nk-inker': [1, 0],
-      'tm-hnk-zadar|tm-nsk-nova-zora': [2, 0],
+      'tm-u2019-nk-inker|tm-u2019-hnk-zadar': [0, 2],
+      'tm-u2019-nk-lokomotiva-plavi|tm-u2019-nsk-nova-zora': [0, 1],
+      'tm-u2019-nk-lokomotiva-plavi|tm-u2019-hnk-zadar': [0, 3],
+      'tm-u2019-nk-inker|tm-u2019-nsk-nova-zora': [0, 1],
+      'tm-u2019-nk-lokomotiva-plavi|tm-u2019-nk-inker': [1, 0],
+      'tm-u2019-hnk-zadar|tm-u2019-nsk-nova-zora': [2, 0],
     });
     const settled = settle(data);
     const qf1 = settled.matches.find((m) => m.code === 'ČF1')!;
     const qf2 = settled.matches.find((m) => m.code === 'ČF2')!;
     const qf3 = settled.matches.find((m) => m.code === 'ČF3')!;
-    expect([qf1.home_team_id, qf1.away_team_id]).toEqual(['tm-nk-zagreb', 'tm-nsk-nova-zora']);
-    expect([qf2.home_team_id, qf2.away_team_id]).toEqual(['tm-hnk-zadar', 'tm-nk-arbanasi']);
+    expect([qf1.home_team_id, qf1.away_team_id]).toEqual(['tm-u2019-nk-zagreb', 'tm-u2019-nsk-nova-zora']);
+    expect([qf2.home_team_id, qf2.away_team_id]).toEqual(['tm-u2019-hnk-zadar', 'tm-u2019-nk-arbanasi']);
     expect([qf3.home_team_id, qf3.away_team_id]).toEqual([null, null]);
   });
 
@@ -188,5 +192,37 @@ describe('konačni poredak', () => {
     const third = finish(blankMatch({ ...base, id: 't', home_team_id: 'C', away_team_id: 'D', winner_place: 3, loser_place: 4 }), 2, 2, [5, 4]);
     const notYet = blankMatch({ ...base, id: 'p', home_team_id: 'E', away_team_id: 'F', winner_place: 5, loser_place: 6 });
     expect(finalRanking([third, f, notYet]).map((p) => [p.place, p.teamId])).toEqual([[1, 'B'], [2, 'A'], [3, 'C'], [4, 'D']]);
+  });
+});
+
+describe('osmina finala 2016. iz pravog rasporeda', () => {
+  it('kad su sve skupine gotove, upišu se prvi i najbolji drugoplasirani', () => {
+    const snap = demoSnapshot();
+    const c = (x: { category_id: string }) => x.category_id === 'u2016';
+    const groups = snap.groups.filter(c);
+    const gts = snap.groupTeams.filter(c);
+    // U svakoj skupini redoslijed momčadi kako su upisane pobjeđuje sve iza sebe,
+    // a prva momčad skupine A daje najviše golova pa su drugoplasirani različiti po gol-razlici.
+    const order = new Map(groups.flatMap((g, gi) => gts.filter((x) => x.group_id === g.id).map((x, i) => [x.team_id, [gi, i]] as const)));
+    const matches = snap.matches.filter(c).map((m) => {
+      if (m.stage !== 'group') return m;
+      const [gi, hi] = order.get(m.home_team_id!)!;
+      const [, ai] = order.get(m.away_team_id!)!;
+      const margin = gi + 1; // skupina A pobjeđuje s 1 razlike, J s 10
+      return hi < ai ? finish(m, margin, 0) : finish(m, 0, margin);
+    });
+    const data = settle({ groups, groupTeams: gts, matches, settings: demoCategory().settings });
+    const os1 = data.matches.find((m) => m.code === 'OS1')!; // 1A – 2#6
+    const os7 = data.matches.find((m) => m.code === 'OS7')!; // 1D – 2#1
+    const firstOf = (g: string) => gts.filter((x) => x.group_id === `u2016-grp-${g}`)[0].team_id;
+    const secondOf = (g: string) => gts.filter((x) => x.group_id === `u2016-grp-${g}`)[1].team_id;
+    expect(os1.home_team_id).toBe(firstOf('a'));
+    // drugi iz J ima najveću gol-razliku (skupina J ima najveće razlike) → 1. najbolji drugi
+    expect(os7.away_team_id).toBe(secondOf('j'));
+    // 6. najbolji drugi = drugi iz E (J, I, H, G, F, E)
+    expect(os1.away_team_id).toBe(secondOf('e'));
+    // B turnir: U5 = 9. najbolji drugi (iz B) – 3A
+    const u5 = data.matches.find((m) => m.code === 'U5')!;
+    expect([u5.home_team_id, u5.away_team_id]).toEqual([secondOf('b'), gts.filter((x) => x.group_id === 'u2016-grp-a')[2].team_id]);
   });
 });

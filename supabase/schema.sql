@@ -64,7 +64,7 @@ create table public.tournaments (
   updated_at       timestamptz not null default now(),
   check (end_date >= start_date),
   check (tiebreakers <@ array['head_to_head', 'goal_difference', 'goals_for',
-                              'wins', 'fewer_goals_against', 'lot']::text[])
+                              'wins', 'fewer_goals_against', 'fewer_cards', 'lot']::text[])
 );
 
 -- ---------------------------------------------------------------------
@@ -89,7 +89,8 @@ create table public.categories (
 create table public.fields (
   id             uuid primary key default gen_random_uuid(),
   tournament_id  uuid not null references public.tournaments (id) on delete cascade,
-  name           text not null,                 -- 'Teren 1'
+  name           text not null,                 -- 'Arbanasi 1'
+  venue          text,                          -- lokacija, npr. 'Arbanasi'
   maps_url       text check (maps_url is null or maps_url ~ '^https://'),
   sort_order     smallint not null default 0,
   unique (tournament_id, name),
@@ -147,6 +148,7 @@ create table public.group_teams (
 --   '1A'      = 1. u skupini A
 --   'W:ČF1'   = pobjednik utakmice ČF1
 --   'L:PF2'   = poraženi u utakmici PF2
+--   '2#6'     = 6. najbolji drugoplasirani iz svih skupina
 -- Kad su uvjeti ispunjeni, server upiše momčad u home_team_id /
 -- away_team_id (osim ako je teams_locked = true).
 --
@@ -163,8 +165,8 @@ create table public.matches (
   label             text,                                          -- 'Četvrtfinale 1'
   home_team_id      uuid,
   away_team_id      uuid,
-  home_source       text check (home_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[WL]:[^[:space:]:]{1,12})$'),
-  away_source       text check (away_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[WL]:[^[:space:]:]{1,12})$'),
+  home_source       text check (home_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[1-9]#[1-9][0-9]?|[WL]:[^[:space:]:]{1,12})$'),
+  away_source       text check (away_source ~ '^([1-9][0-9]?[A-Z]{1,2}|[1-9]#[1-9][0-9]?|[WL]:[^[:space:]:]{1,12})$'),
   field_id          uuid,
   starts_at         timestamptz,                -- prazno = termin još nije poznat
   duration_minutes  smallint check (duration_minutes between 1 and 120),  -- prazno = iz kategorije
@@ -173,6 +175,11 @@ create table public.matches (
   home_penalties    smallint check (home_penalties >= 0),
   away_penalties    smallint check (away_penalties >= 0),
   status            public.match_status not null default 'scheduled',
+  home_yellow       smallint not null default 0 check (home_yellow >= 0),
+  away_yellow       smallint not null default 0 check (away_yellow >= 0),
+  home_red          smallint not null default 0 check (home_red >= 0),
+  away_red          smallint not null default 0 check (away_red >= 0),
+  bracket           text check (bracket ~ '^[A-Z]{1,2}$'),  -- 'A' ili 'B' turnir
   winner_place      smallint check (winner_place > 0),
   loser_place       smallint check (loser_place > 0),
   teams_locked      boolean not null default false,  -- ručna promjena, automatika ne dira

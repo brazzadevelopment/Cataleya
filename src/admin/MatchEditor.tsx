@@ -34,7 +34,10 @@ export function MatchEditor({ match, stage, onClose }: { match?: Match; stage?: 
     const teamsChangedByHand = !!original && (original.home_team_id !== m.home_team_id || original.away_team_id !== m.away_team_id);
     const norm = (s: string | null) => {
       const p = parseSource(s);
-      return !p ? null : p.kind === 'group' ? `${p.position}${p.group}` : `${p.kind === 'winner' ? 'W' : 'L'}:${p.code}`;
+      if (!p) return null;
+      if (p.kind === 'group') return `${p.position}${p.group}`;
+      if (p.kind === 'best') return `${p.position}#${p.nth}`;
+      return `${p.kind === 'winner' ? 'W' : 'L'}:${p.code}`;
     };
     const row = {
       ...m,
@@ -73,6 +76,11 @@ export function MatchEditor({ match, stage, onClose }: { match?: Match; stage?: 
           )}
         </div>
         {knockout && (
+          <Field label="Turnir">
+            <SelectBox value={m.bracket ?? ''} onChange={(e) => set('bracket', e.target.value || null)} options={[['', '—'], ['A', 'A turnir'], ['B', 'B turnir']]} />
+          </Field>
+        )}
+        {knockout && (
           <Field label="Naziv (po želji)" hint="npr. Četvrtfinale 1, Za 5. mjesto">
             <Input value={m.label ?? ''} onChange={(e) => set('label', e.target.value || null)} />
           </Field>
@@ -98,7 +106,7 @@ export function MatchEditor({ match, stage, onClose }: { match?: Match; stage?: 
             <div key={side} className="card space-y-2 p-3">
               <div className="text-[12px] font-extrabold tracking-wider text-gold uppercase">{side === 'home' ? 'Domaćin' : 'Gost'}</div>
               {knockout && (
-                <Field label="Tko ulazi (pravilo)" hint="1A = 1. u skupini A · W:ČF1 = pobjednik ČF1 · L:PF1 = poraženi PF1">
+                <Field label="Tko ulazi (pravilo)" hint="1A = 1. u skupini A · 2#6 = 6. najbolji drugoplasirani · W:OS1 = pobjednik OS1 · L:PF1 = poraženi PF1">
                   <Input value={m[srcKey] ?? ''} onChange={(e) => set(srcKey, e.target.value || null)} placeholder="npr. 1A" className={sourceOk(m[srcKey]) ? '' : 'ring-live'} />
                 </Field>
               )}

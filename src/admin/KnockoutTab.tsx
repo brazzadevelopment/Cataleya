@@ -23,6 +23,7 @@ export function KnockoutTab() {
       const { tournament_id: _t, ...row } = blankMatch({
         id: newId(), tournament_id: snap.tournament.id, category_id: categoryId, stage, code, label,
         home_source: home, away_source: away, winner_place: wp, loser_place: lp,
+        bracket: ko.find((m) => m.code === 'ČF1')?.bracket ?? null,
       });
       return { type: 'upsert', table: 'matches', row };
     };

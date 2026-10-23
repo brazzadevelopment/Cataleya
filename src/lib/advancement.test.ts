@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeAdvancement, finalRanking, matchOutcome, parseSource, sourceLabel, type CategoryData } from './advancement';
+import { computeAdvancement, finalRanking, matchOutcome, parseSource, provisionalTeams, sourceLabel, type CategoryData } from './advancement';
 import { blankMatch, demoSnapshot } from '../data/seed';
 import type { Match } from './types';
 
@@ -224,5 +224,24 @@ describe('osmina finala 2016. iz pravog rasporeda', () => {
     // B turnir: U5 = 9. najbolji drugi (iz B) – 3A
     const u5 = data.matches.find((m) => m.code === 'U5')!;
     expect([u5.home_team_id, u5.away_team_id]).toEqual([secondOf('b'), gts.filter((x) => x.group_id === 'u2016-grp-a')[2].team_id]);
+  });
+});
+
+describe('trenutno stanje nastavka', () => {
+  it('pokazuje tko je sada prvi u skupini, a ništa ne upisuje', () => {
+    const data = demoCategory();
+    const gid = data.groups.find((g) => g.name === 'A')!.id;
+    const first = data.matches.find((m) => m.group_id === gid)!;
+    const played = { ...data, matches: data.matches.map((m) => (m.id === first.id ? finish(m, 3, 0) : m)) };
+    const qf = played.matches.find((m) => m.home_source === '1A')!;
+
+    expect(computeAdvancement(played)).toEqual([]);
+    const p = provisionalTeams(played).get(qf.id);
+    expect(p?.home).toBe(first.home_team_id);
+    expect(p?.away).toBeNull(); // 2B: u skupini B se još nije igralo
+  });
+
+  it('ne pokazuje ništa prije prve utakmice', () => {
+    expect(provisionalTeams(demoCategory()).size).toBe(0);
   });
 });

@@ -1,4 +1,4 @@
-import { sourceLabel } from './advancement';
+import { provisionalTeams, sourceLabel, type ProvisionalSides } from './advancement';
 import { localDate, timeRange } from './time';
 import type { Match, MatchStage, Snapshot } from './types';
 
@@ -20,12 +20,39 @@ export function teamName(s: Snapshot, id: string | null): string | null {
 }
 
 /** Naziv momčadi ili oznaka mjesta ('1. A', 'Pobjednik ČF1'). */
-export function sideLabel(s: Snapshot, m: Match, side: 'home' | 'away'): { name: string; known: boolean } {
+export interface SideLabel {
+  name: string;
+  known: boolean;
+  /** Tko je sada na tom mjestu dok skupine još traju (nije konačno). */
+  provisional?: string;
+}
+
+export function sideLabel(s: Snapshot, m: Match, side: 'home' | 'away'): SideLabel {
   const id = side === 'home' ? m.home_team_id : m.away_team_id;
   const name = teamName(s, id);
   if (name) return { name, known: true };
   const src = sourceLabel(side === 'home' ? m.home_source : m.away_source);
-  return { name: src ?? 'Još nije poznato', known: false };
+  const p = provisionalFor(s, m.category_id).get(m.id);
+  const provisional = teamName(s, side === 'home' ? p?.home ?? null : p?.away ?? null) ?? undefined;
+  return { name: src ?? 'Još nije poznato', known: false, provisional };
+}
+
+const provisionalCache = new WeakMap<Snapshot, Map<string, Map<string, ProvisionalSides>>>();
+
+function provisionalFor(s: Snapshot, categoryId: string): Map<string, ProvisionalSides> {
+  let byCat = provisionalCache.get(s);
+  if (!byCat) provisionalCache.set(s, (byCat = new Map()));
+  let out = byCat.get(categoryId);
+  if (!out) {
+    out = provisionalTeams({
+      groups: s.groups.filter((g) => g.category_id === categoryId),
+      groupTeams: s.groupTeams.filter((gt) => gt.category_id === categoryId),
+      matches: s.matches.filter((x) => x.category_id === categoryId),
+      settings: s.tournament,
+    });
+    byCat.set(categoryId, out);
+  }
+  return out;
 }
 
 export function fieldName(s: Snapshot, id: string | null): string | null {

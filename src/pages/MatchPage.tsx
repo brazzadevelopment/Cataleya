@@ -4,7 +4,7 @@ import { Empty, Icon, LiveBadge, StarButton, TeamBadge } from '../components/ui'
 import { useTournament } from '../data/TournamentContext';
 import { matchOutcome } from '../lib/advancement';
 import { dayLabel } from '../lib/time';
-import { hasScore, matchDay, matchPhase, matchTime, sideLabel } from '../lib/view';
+import { hasScore, matchDay, matchPhase, matchTime, sideLabel, type SideLabel } from '../lib/view';
 
 export function MatchPage() {
   const { id } = useParams();
@@ -79,12 +79,18 @@ export function MatchPage() {
   );
 }
 
-function Side({ label, teamId, winner }: { label: { name: string; known: boolean }; teamId: string | null; winner: boolean }) {
+function Side({ label, teamId, winner }: { label: SideLabel; teamId: string | null; winner: boolean }) {
   const { snap } = useTournament();
   const inner = (
     <div className="flex flex-col items-center gap-2">
       {label.known ? <TeamBadge name={label.name} size="size-14" /> : <span className="size-14 rounded-full border-2 border-dashed border-white/25" />}
       <span className={`text-[14px] leading-tight ${label.known ? 'font-extrabold' : 'italic text-white/55'} ${winner ? 'text-gold' : ''}`}>{label.name}</span>
+      {label.provisional && (
+        <span className="text-[13px] font-bold leading-tight">
+          {label.provisional}
+          <span className="block text-[11px] font-semibold text-white/45">trenutno, nije konačno</span>
+        </span>
+      )}
     </div>
   );
   return (

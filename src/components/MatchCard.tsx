@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTournament } from '../data/TournamentContext';
 import type { Match } from '../lib/types';
 import { matchOutcome } from '../lib/advancement';
-import { fieldName, hasScore, matchPhase, matchTime, sideLabel } from '../lib/view';
+import { fieldName, hasScore, matchPhase, matchTime, sideLabel, type SideLabel } from '../lib/view';
 import { LiveBadge, StarButton, TeamBadge } from './ui';
 
 export function MatchCard({ match: m, showPhase = true }: { match: Match; showPhase?: boolean }) {
@@ -38,12 +38,17 @@ export function MatchCard({ match: m, showPhase = true }: { match: Match; showPh
   );
 }
 
-function TeamRow({ label, teamId, winner }: { label: { name: string; known: boolean }; teamId: string | null; winner: boolean }) {
+function TeamRow({ label, teamId, winner }: { label: SideLabel; teamId: string | null; winner: boolean }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5 py-1">
       {label.known ? <TeamBadge name={label.name} size="size-7" /> : <span className="size-7 shrink-0 rounded-full border border-dashed border-white/25" />}
       <span className={`min-w-0 truncate text-[15px] ${label.known ? 'font-bold' : 'font-semibold italic text-white/55'} ${winner ? 'text-white' : ''}`}>
         {label.name}
+        {label.provisional && (
+          <span className="block truncate text-[13px] font-bold not-italic text-white/80">
+            {label.provisional} <span className="font-semibold text-white/45">· trenutno, nije konačno</span>
+          </span>
+        )}
       </span>
       {teamId && <StarButton teamId={teamId} className="-my-1 ml-auto size-8" />}
     </div>

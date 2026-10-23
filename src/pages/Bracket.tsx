@@ -16,8 +16,14 @@ export function Bracket() {
     return <Empty>Utakmice nastavka još nisu upisane. Organizator ih dodaje kad bude poznat raspored.</Empty>;
   }
   const brackets = [...new Set(ko.map((m) => m.bracket ?? ''))].sort();
+  const open = ko.some((m) => (!m.home_team_id && m.home_source) || (!m.away_team_id && m.away_source));
   return (
     <div>
+      {open && (
+        <p className="mt-3 rounded-xl bg-white/6 px-3 py-2 text-[12px] leading-snug text-white/70">
+          Ime ispod oznake mjesta je <b className="text-white/90">trenutno stanje</b> po tablicama, nije konačno. Momčad se upiše kad njezina skupina završi.
+        </p>
+      )}
       {brackets.map((b) => (
         <BracketSection key={b || 'none'} title={b ? `${b} turnir` : 'Ždrijeb'} matches={ko.filter((m) => (m.bracket ?? '') === b)} />
       ))}
@@ -103,6 +109,11 @@ function BracketNode({ match: m }: { match: Match }) {
         <div key={s.side} className={`flex items-center gap-1.5 px-2.5 py-1 ${s.lost ? 'opacity-50' : ''}`}>
           <span className={`min-w-0 flex-1 truncate text-[13px] ${s.label.known ? 'font-bold' : 'italic text-white/55'} ${s.won ? 'text-gold' : ''}`}>
             {s.label.name}
+            {s.label.provisional && (
+              <span className="block truncate text-[12px] font-bold not-italic text-white/80">
+                {s.label.provisional} <span className="font-semibold text-white/45">· trenutno</span>
+              </span>
+            )}
           </span>
           {s.pen != null && <span className="text-[10px] text-white/50">({s.pen})</span>}
           <span className="w-4 text-right text-[14px] font-black tabular-nums">{s.score ?? ''}</span>

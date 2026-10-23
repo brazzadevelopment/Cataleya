@@ -160,6 +160,46 @@ export function computeAdvancement(data: CategoryData): TeamAssignment[] {
 }
 
 // ---------------------------------------------------------------------
+// Trenutno stanje (nije konačno)
+// ---------------------------------------------------------------------
+
+export interface ProvisionalSides {
+  home: string | null;
+  away: string | null;
+}
+
+/**
+ * Tko bi sada bio na praznim mjestima nastavka da skupine ovdje završe.
+ * Samo za prikaz: ništa se ne upisuje. Gleda se trenutni redoslijed u
+ * tablici (i kod izjednačenja) i samo skupine u kojima se već igralo.
+ * Mjesta 'Pobjednik ...' ostaju prazna dok se ta utakmica ne odigra.
+ */
+export function provisionalTeams(data: CategoryData): Map<string, ProvisionalSides> {
+  const tables = new Map<string, GroupTable>();
+  for (const [name, t] of groupTables(data)) {
+    if (!t.rows.some((r) => r.played > 0)) continue;
+    tables.set(name, { ...t, complete: true, rows: t.rows.map((r, i) => ({ ...r, rank: i + 1 })) });
+  }
+  const pick = (raw: string | null): string | null => {
+    const src = parseSource(raw);
+    if (src?.kind === 'group') return tables.get(src.group)?.rows[src.position - 1]?.teamId ?? null;
+    if (src?.kind === 'best') {
+      const cross = rankAcrossGroups([...tables].map(([groupName, table]) => ({ groupName, table })), src.position, data.settings);
+      return cross.rows[src.nth - 1]?.teamId ?? null;
+    }
+    return null;
+  };
+  const out = new Map<string, ProvisionalSides>();
+  for (const m of data.matches) {
+    if (m.stage === 'group') continue;
+    const home = m.home_team_id ? null : pick(m.home_source);
+    const away = m.away_team_id ? null : pick(m.away_source);
+    if (home || away) out.set(m.id, { home, away });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------
 // Konačni poredak
 // ---------------------------------------------------------------------
 

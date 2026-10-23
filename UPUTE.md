@@ -146,6 +146,8 @@ Ako pravila turnira traže drukčije, javi: to je jedna funkcija u `src/lib/stan
 
 ## 4. Upute za zapisničara
 
+Iste upute su i u aplikaciji: `/t/cataleya-cup-2026/upute-zapisnicar` (link je na ekranu Prijava). Upute za roditelje su na `/t/cataleya-cup-2026/upute` (dno početne, „Kako koristiti”).
+
 1. Otvori aplikaciju → dno početne → **Prijava** → PIN svog terena.
 2. Vidiš samo utakmice na svom terenu, sljedeća je na vrhu. Dodirni utakmicu.
 3. **Počni utakmicu** kad sudac zazvižda. Gledatelji vide „Uživo”.

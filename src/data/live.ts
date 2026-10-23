@@ -1,4 +1,5 @@
-// Pravi način: čitanje iz Supabasea, izmjene preko serverskih funkcija (api/).
+// Pravi način: čitanje iz Supabasea, izmjene preko Supabase Edge Function
+// (supabase/functions/api), koja provjerava PIN.
 
 import { createClient } from '@supabase/supabase-js';
 import { MutationError, type Mutation } from '../lib/mutations';
@@ -28,15 +29,27 @@ function writeQueue(q: Queued[]): void {
   }
 }
 
-async function post<T>(path: string, body: unknown, token?: string): Promise<T> {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
-  if (!res.ok) throw new MutationError(data.error ?? `Greška ${res.status}`, res.status);
-  return data;
+interface Api {
+  post<T>(action: 'login' | 'mutate' | 'upload', body: unknown, token?: string): Promise<T>;
+}
+
+function api(url: string, anonKey: string): Api {
+  return {
+    async post<T>(action: string, body: unknown, token?: string): Promise<T> {
+      const res = await fetch(`${url}/functions/v1/api/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          ...(token ? { 'x-turnir-token': token } : {}),
+        },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string } & T;
+      if (!res.ok) throw new MutationError(data.error ?? `Greška ${res.status}`, res.status);
+      return data;
+    },
+  };
 }
 
 function isNetworkError(e: unknown): boolean {
@@ -45,6 +58,7 @@ function isNetworkError(e: unknown): boolean {
 
 export function createLiveSource(url: string, anonKey: string): DataSource {
   const db = createClient(url, anonKey, { auth: { persistSession: false } });
+  const { post } = api(url, anonKey);
 
   let flushing = false;
   async function flush(): Promise<void> {
@@ -55,7 +69,7 @@ export function createLiveSource(url: string, anonKey: string): DataSource {
       while (q.length) {
         const [item] = q;
         try {
-          await post('/api/mutate', { mutations: item.mutations }, item.session.token);
+          await post('mutate', { mutations: item.mutations }, item.session.token);
         } catch (e) {
           if (isNetworkError(e)) break;
           // Server je odbio izmjenu (npr. istekla prijava): ne pokušava ponovno.
@@ -112,7 +126,7 @@ export function createLiveSource(url: string, anonKey: string): DataSource {
     },
     async login(tournamentId, pin) {
       try {
-        return await post<Session>('/api/login', { tournamentId, pin });
+        return await post<Session>('login', { tournamentId, pin });
       } catch (e) {
         if (e instanceof MutationError && e.status === 401) return null;
         throw e;
@@ -121,7 +135,7 @@ export function createLiveSource(url: string, anonKey: string): DataSource {
     async mutate(session, mutations) {
       try {
         await flush();
-        await post('/api/mutate', { mutations }, session.token);
+        await post('mutate', { mutations }, session.token);
       } catch (e) {
         // Rezultati se ne smiju izgubiti zbog slabog signala na terenu.
         if (isNetworkError(e) && mutations.every((m) => m.type === 'score')) {
@@ -138,7 +152,7 @@ export function createLiveSource(url: string, anonKey: string): DataSource {
         reader.onerror = () => reject(new MutationError('Slika se nije mogla učitati.'));
         reader.readAsDataURL(file);
       });
-      const res = await post<{ path: string }>('/api/upload', { name: file.name, type: file.type, data }, session.token);
+      const res = await post<{ path: string }>('upload', { name: file.name, type: file.type, data }, session.token);
       return res.path;
     },
   };

@@ -6,7 +6,8 @@
 -- Načela:
 --   * Svi čitaju (gledatelji nemaju račun ni prijavu).
 --   * Nitko ne piše izravno u bazu. Sve izmjene idu preko serverskih
---     funkcija (Vercel, api/), koje provjere PIN i pišu ključem service_role.
+--     funkcije (Supabase Edge Function `api`), koja provjeri PIN i piše
+--     ključem service_role.
 --   * PIN-ovi:
 --       glavni PIN   = uređivanje svega u turniru (organizator)
 --       PIN terena   = upis rezultata samo za utakmice na tom terenu
@@ -229,6 +230,15 @@ create table public.pins (
 create unique index pins_one_admin on public.pins (tournament_id) where role = 'admin';
 create unique index pins_one_per_field on public.pins (field_id) where role = 'field';
 
+-- Tajna kojom serverska funkcija potpisuje prijavu PIN-om. Nastaje sama,
+-- nitko je ne vidi osim servera (service_role).
+create table public.app_secrets (
+  name   text primary key,
+  value  text not null
+);
+insert into public.app_secrets (name, value)
+values ('session', encode(extensions.gen_random_bytes(32), 'hex'));
+
 -- ---------------------------------------------------------------------
 -- Funkcije za PIN-ove (smije ih zvati samo server, service_role)
 -- ---------------------------------------------------------------------
@@ -286,7 +296,7 @@ grant execute on function public.check_pin(uuid, text)     to service_role;
 
 create function public.touch_updated_at()
 returns trigger
-language plpgsql
+language plpgsql set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -313,8 +323,9 @@ alter table public.groups       enable row level security;
 alter table public.group_teams  enable row level security;
 alter table public.matches      enable row level security;
 alter table public.pins         enable row level security;
+alter table public.app_secrets  enable row level security;
 
-revoke all on public.pins from anon, authenticated;
+revoke all on public.pins, public.app_secrets from anon, authenticated;
 
 do $$
 declare

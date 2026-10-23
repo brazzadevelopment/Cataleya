@@ -1,5 +1,5 @@
 // Izmjene podataka. Isti opis izmjene koristi demo način (primjenjuje ga
-// u pregledniku) i serverska funkcija api/mutate (primjenjuje ga u bazi),
+// u pregledniku) i serverska funkcija (server/core.ts) (primjenjuje ga u bazi),
 // pa su pravila o tome tko smije što na jednom mjestu.
 
 import { computeAdvancement, type TeamAssignment } from './advancement.js';

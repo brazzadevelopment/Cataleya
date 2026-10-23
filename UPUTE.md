@@ -24,35 +24,36 @@ U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezu
 
 ## 2. Postavljanje (Supabase + Vercel)
 
-### 2.1 Supabase (baza)
+### 2.1 Supabase (baza i server)
 
 1. Na https://supabase.com napravi novi projekt (regija **Frankfurt**, `eu-central-1`).
-2. **SQL Editor → New query**: zalijepi cijeli `supabase/schema.sql` i klikni **Run**.
+2. **SQL Editor → New query**: zalijepi cijeli `supabase/schema.sql` i klikni **Run**. Shema sama napravi i tajnu za prijavu (tablica `app_secrets`).
 3. Opet **New query**: zalijepi `supabase/seed.sql` (Cataleya Cup: 4 godišta, momčadi, skupine, raspored, osmine A i B turnira) i klikni **Run**.
-4. Postavi PIN-ove. Na dnu `seed.sql` su gotove naredbe za glavni PIN i svih 11 terena. Kopiraj ih u novi upit, makni `-- ` na početku retka, umjesto `XXXX` upiši PIN i klikni **Run**. Na primjer:
+4. Postavi PIN-ove (glavni i za svaki teren). PIN ima 4 do 8 znamenki, a svi PIN-ovi u turniru moraju biti različiti:
 
    ```sql
-   select set_pin('e0bd4789-db5e-406e-817b-520be1fc82fe', null, 'XXXX');  -- glavni PIN
+   -- glavni PIN (organizator)
+   select set_pin(md5('cataleya:T')::uuid, null, 'XXXX');
+   -- PIN terena, po nazivu terena
+   select set_pin(md5('cataleya:T')::uuid, id, 'YYYY') from fields where name = 'Miro Surać 1';
    ```
 
-   PIN ima 4 do 8 znamenki, a svi PIN-ovi u turniru moraju biti različiti. Kasnije ih organizator mijenja u aplikaciji.
-5. **Project Settings → API**: zapiši **Project URL**, ključ **anon public** i ključ **service_role**. Ključ `service_role` je tajan: ide samo na Vercel, nikad u kod ni u poruke.
+   Kasnije ih organizator mijenja u aplikaciji.
+5. Serverska funkcija (Edge Function `api`): `npm run build:edge`, zatim `supabase functions deploy api --no-verify-jwt`. Ona provjerava PIN i jedina piše u bazu. Ključ `service_role` Supabase joj daje sam; ne upisuje se nigdje.
+6. **Project Settings → API**: zapiši **Project URL** i javni ključ (**publishable** ili **anon public**).
 
 ### 2.2 Vercel (hosting)
 
 1. Na https://vercel.com: **Add New → Project**, odaberi repozitorij `brazzadevelopment/Cataleya`.
 2. Framework se sam prepozna (Vite). Root Directory ostaje prazan.
-3. **Environment Variables**:
+3. **Environment Variables** (samo dvije, obje su javne):
 
    | Naziv | Vrijednost |
    |---|---|
    | `VITE_SUPABASE_URL` | Project URL |
-   | `VITE_SUPABASE_ANON_KEY` | anon public ključ |
-   | `SUPABASE_URL` | Project URL |
-   | `SUPABASE_SERVICE_ROLE_KEY` | service_role ključ (tajno) |
-   | `SESSION_SECRET` | dugi nasumični niz, npr. iz `openssl rand -hex 32` |
+   | `VITE_SUPABASE_ANON_KEY` | publishable / anon ključ |
 
-4. **Deploy**. Aplikacija je na adresi poput `https://cataleya-xxxx.vercel.app/t/cataleya-cup-2026`.
+4. **Deploy**. Aplikacija je na adresi poput `https://cataleya.vercel.app/t/cataleya-cup-2026`.
 5. Po želji: **Settings → Domains** za vlastitu domenu.
 
 Nakon promjene varijabli treba **Redeploy**, jer se `VITE_` varijable ugrade u aplikaciju pri izradi.
@@ -141,7 +142,7 @@ Ako pravila turnira traže drukčije, javi: to je jedna funkcija u `src/lib/stan
 
 - Promjena PIN-a odmah odjavljuje sve koji su ušli starim PIN-om.
 - PIN se nakon spremanja ne prikazuje, pa ga zapiši. Ako ga zaboraviš, postavi novi glavnim PIN-om.
-- Ako zaboraviš glavni PIN: Supabase → SQL Editor → `select set_pin('<ID turnira>', null, 'NOVI');`.
+- Ako zaboraviš glavni PIN: Supabase → SQL Editor → `select set_pin(md5('cataleya:T')::uuid, null, 'NOVI');`.
 
 ## 4. Upute za zapisničara
 
@@ -164,6 +165,7 @@ npm test           # logika tablica, ždrijeba, uvoza i prava (Vitest)
 npm run typecheck
 npm run build
 npm run seed-sql   # iz src/data/seed.ts napravi supabase/seed.sql
+npm run build:edge # iz server/core.ts napravi supabase/functions/api/core.js
 ```
 
 | Mjesto | Što je |
@@ -173,10 +175,11 @@ npm run seed-sql   # iz src/data/seed.ts napravi supabase/seed.sql
 | `src/lib/mutations.ts` | tko smije što; ista pravila u demo načinu i na serveru |
 | `src/lib/excel.ts` | uvoz rasporeda |
 | `src/data/demo.ts`, `src/data/live.ts` | demo (localStorage) i pravi način (Supabase) |
-| `api/login.ts`, `api/mutate.ts`, `api/upload.ts` | serverske funkcije: provjera PIN-a, sve izmjene, logo |
+| `server/core.ts` | serverska logika: provjera PIN-a, sve izmjene, logo |
+| `supabase/functions/api/` | Supabase Edge Function; `core.js` nastaje iz `server/core.ts` (`npm run build:edge`) |
 | `supabase/schema.sql` | tablice, RLS (svi čitaju, nitko ne piše izravno), PIN-ovi kao bcrypt hash |
 
-**Kako radi pisanje:** preglednik nikad ne piše u bazu. Šalje izmjenu na `/api/mutate` s tokenom koji dobije prijavom PIN-om. Server provjeri pravo, zapiše izmjenu i preračuna nastavak turnira. Realtime zatim javi svim gledateljima da se utakmica promijenila.
+**Kako radi pisanje:** preglednik nikad ne piše u bazu. Šalje izmjenu na Edge Function (`/functions/v1/api/mutate`) s tokenom koji dobije prijavom PIN-om. Server provjeri pravo, zapiše izmjenu i preračuna nastavak turnira. Realtime zatim javi svim gledateljima da se utakmica promijenila.
 
 **Novi turnir za drugog organizatora:** u `seed.ts` promijeni podatke, pokreni `npm run seed-sql` i SQL pokreni u Supabaseu. Zatim postavi glavni PIN (`set_pin`). Turnir je na `/t/<slug>`, a početna stranica pokazuje popis turnira.
 

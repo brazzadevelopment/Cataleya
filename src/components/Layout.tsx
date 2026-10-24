@@ -27,13 +27,21 @@ export function Layout() {
               </div>
             </div>
           </NavLink>
-          {session && (
+          {session ? (
             <NavLink
               to={session.role === 'admin' ? `${base}/admin` : `${base}/zapisnik`}
               aria-label={session.role === 'admin' ? 'Uređivanje' : 'Zapisnik'}
               className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-gold/15 text-gold ring-1 ring-gold/40"
             >
               <Icon name={session.role === 'admin' ? 'edit' : 'whistle'} className="size-5" />
+            </NavLink>
+          ) : (
+            <NavLink
+              to={`${base}/prijava`}
+              aria-label="Prijava za zapisničare"
+              className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-white/8 text-white/75 ring-1 ring-white/15"
+            >
+              <Icon name="key" className="size-5" />
             </NavLink>
           )}
         </div>

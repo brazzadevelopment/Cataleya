@@ -92,7 +92,7 @@ export function HelpScorekeeper() {
       <Steps>
         <Step title="Uzmi PIN od organizatora">Svaki teren ima svoj PIN. S njim vidiš i upisuješ samo utakmice svog terena.</Step>
         <Step title="Prijavi se">
-          Otvori aplikaciju, na dnu početne dodirni <Link to={`${base}/prijava`} className="font-bold text-gold">Prijava</Link> i upiši PIN. Ostaješ prijavljen do kraja turnira, pa se ne odjavljuj.
+          Otvori aplikaciju, gore desno dodirni ključić (ili na dnu početne <Link to={`${base}/prijava`} className="font-bold text-gold">Prijava</Link>) i upiši PIN. Ostaješ prijavljen do kraja turnira, pa se ne odjavljuj.
         </Step>
         <Step title="Provjeri popis">Vidiš utakmice svog terena, sljedeća je na vrhu. Provjeri jesu li momčadi i vrijeme točni.</Step>
       </Steps>

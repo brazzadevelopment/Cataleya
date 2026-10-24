@@ -16,7 +16,7 @@ export function Layout() {
           Demo · podaci su samo na ovom uređaju
         </div>
       )}
-      <header className="sticky top-0 z-20 border-b border-line bg-pitch-950/85 px-4 pb-2.5 pt-3 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-line bg-pitch-950/85 px-4 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
         <div className="flex items-center gap-3">
           <NavLink to={base} className="flex min-w-0 items-center gap-3">
             <Emblem className="size-11 drop-shadow-[0_0_12px_rgb(164_91_224_/_0.45)]" />

@@ -73,7 +73,7 @@ function TournamentList() {
   if (!list) return <Splash text="Učitavam…" />;
   if (list.length === 1) return <Navigate to={`/t/${list[0].slug}`} replace />;
   return (
-    <div className="mx-auto max-w-xl px-4 py-10">
+    <div className="mx-auto max-w-xl px-4 pb-10 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
       <img src="/emblem.svg" alt="" className="mx-auto size-16" />
       <h1 className="heading mt-4 text-center text-2xl">Turniri</h1>
       <div className="mt-6 space-y-3">

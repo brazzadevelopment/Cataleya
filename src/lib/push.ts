@@ -35,6 +35,30 @@ export function isIos(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
+/** Samsungov preglednik („Internet”) na Androidu. */
+export function isSamsungBrowser(): boolean {
+  return /SamsungBrowser/i.test(navigator.userAgent);
+}
+
+/** Preglednik ugrađen u drugu aplikaciju (Facebook, Instagram, Messenger…). */
+export function isInAppBrowser(): boolean {
+  return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|TikTok|Snapchat|; wv\)/i.test(navigator.userAgent);
+}
+
+/** Na Androidu treba Chrome; na iPhoneu Safari. Vraća poruku ako je otvoreno u krivom pregledniku. */
+export function wrongBrowser(): 'samsung' | 'inapp' | null {
+  if (isStandalone()) return null;
+  if (isSamsungBrowser()) return 'samsung';
+  if (isInAppBrowser()) return 'inapp';
+  return null;
+}
+
+/** Link koji na Androidu otvara trenutnu stranicu u Chromeu. */
+export function chromeIntentUrl(): string {
+  const { host, pathname, search } = location;
+  return `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;end`;
+}
+
 export function isStandalone(): boolean {
   return matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
 }

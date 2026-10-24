@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { BrowserWarning } from '../components/BrowserWarning';
 import { NotificationsCard } from '../components/Notifications';
 import { Button, Chip, Icon, SectionTitle } from '../components/ui';
 import { canInstall, isIos, isStandalone, promptInstall } from '../lib/push';
@@ -47,6 +48,8 @@ export function NotifyGuide() {
         Dobij obavijest kad tvoja momčad zabije gol, kad utakmica počne i završi, i za svaki karton. Treba samo jednom namjestiti.
       </p>
 
+      <BrowserWarning />
+
       {installed && (
         <div className="card mt-4 flex items-center gap-2.5 p-3 text-[14px]">
           <Icon name="check" className="size-5 text-gold" /> Aplikacija je već na početnom zaslonu. Samo uključi obavijesti ispod.
@@ -84,7 +87,9 @@ export function NotifyGuide() {
             </Button>
           )}
           <Steps>
-            <Step title="Otvori stranicu u Chromeu" />
+            <Step title="Otvori stranicu u Chromeu">
+              <b className="text-white">Samsung:</b> ne u Samsungovom pregledniku („Internet”), nego u Chromeu. U Samsungovom pregledniku aplikacija se ne može dodati na početni zaslon i obavijesti ne stižu. Ako link otvara krivi preglednik: dugo pritisni link → „Otvori u Chromeu”, ili kopiraj adresu u Chrome.
+            </Step>
             <Step title={<>Dodirni ⋮ gore desno</>}>Pa „Dodaj na početni zaslon” ili „Instaliraj aplikaciju”. Može i bez toga, ali je ovako lakše.</Step>
             <Step title="Označi svoju momčad zvjezdicom">Možeš i više momčadi.</Step>
             <Step title="Moje → Uključi obavijesti → Dopusti">Mobitel pita smije li stranica slati obavijesti. Dodirni „Dopusti”.</Step>

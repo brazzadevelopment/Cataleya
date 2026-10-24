@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTournament } from '../data/TournamentContext';
-import { ALL_EVENTS, disablePush, enablePush, isIos, pushSupport, readPrefs, syncPush, type PushEvent } from '../lib/push';
+import { ALL_EVENTS, disablePush, enablePush, isIos, pushSupport, readPrefs, syncPush, wrongBrowser, type PushEvent } from '../lib/push';
+import { BrowserWarning } from './BrowserWarning';
 import { Button, Icon } from './ui';
 
 const CHOICES: { label: string; events: PushEvent[] }[] = [
@@ -51,6 +52,8 @@ export function NotificationsCard() {
           </div>
         </div>
       </div>
+
+      {wrongBrowser() && <BrowserWarning />}
 
       {support === 'demo' && <p className="mt-3 text-[13px] text-white/65">U demo načinu obavijesti ne rade.</p>}
 

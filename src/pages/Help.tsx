@@ -39,7 +39,7 @@ export function HelpParents() {
       <Steps>
         <Step title="Otvori link ili skeniraj QR kod">Link dobiješ od kluba ili organizatora, a QR kod je na plakatu uz teren.</Step>
         <Step title="Dodaj aplikaciju na početni zaslon">
-          iPhone: u Safariju dodirni Dijeli, pa „Dodaj na početni zaslon”. Android: u Chromeu dodirni ⋮, pa „Instaliraj aplikaciju”. Otvara se kao prava aplikacija.
+          iPhone: u Safariju dodirni Dijeli, pa „Dodaj na početni zaslon”. Android: u Chromeu dodirni ⋮, pa „Instaliraj aplikaciju”. Samsung: obavezno u Chromeu, ne u Samsungovom pregledniku („Internet”). Otvara se kao prava aplikacija.
         </Step>
         <Step title="Odaberi godište">Gore ispod naziva turnira: 2016., 2017., 2018. ili 2019.</Step>
         <Step title="Označi svoju momčad zvjezdicom">

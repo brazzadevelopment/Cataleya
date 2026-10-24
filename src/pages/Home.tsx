@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MatchCard } from '../components/MatchCard';
+import { BrowserWarning } from '../components/BrowserWarning';
 import { NotifyBanner } from '../components/Notifications';
 import { Emblem, Empty, Icon, SectionTitle, StarButton, TeamBadge } from '../components/ui';
 import { useTournament } from '../data/TournamentContext';
@@ -38,6 +39,7 @@ export function Home() {
         {venues.length > 0 && <p className="relative mt-1 text-[12px] text-white/50">{venues.join(' · ')}</p>}
       </section>
 
+      <BrowserWarning />
       <NotifyBanner />
 
       {podium.length > 0 && (

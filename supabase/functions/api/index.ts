@@ -28,7 +28,7 @@ async function sessionSecret(): Promise<string> {
   return secret;
 }
 
-const VAPID_SUBJECT = 'https://cataleya-seven.vercel.app';
+const VAPID_SUBJECT = 'https://cataleya.klubapp.hr';
 let vapid: VapidKeys | null = null;
 async function vapidKeys(): Promise<VapidKeys> {
   if (vapid) return vapid;

@@ -25,7 +25,7 @@ export function Privacy() {
       <h2 className="heading text-base text-white">Organizatori i zapisničari</h2>
       <p>Prijavljuju se PIN-om. PIN se sprema samo zaštićeno (kao hash), a prijava traje najviše četiri dana.</p>
       <h2 className="heading text-base text-white">Gdje su podaci</h2>
-      <p>Podaci o turnirima su na serverima u Europskoj uniji (Supabase, Frankfurt). Stranica se poslužuje preko Vercela.</p>
+      <p>Podaci o turnirima i aplikacija su na serveru organizatora (Hostinger VPS, upravljanje preko Coolifyja). Podaci se ne prodaju niti dijele s drugima.</p>
       <h2 className="heading text-base text-white">Kontakt</h2>
       <p>Za pitanja o privatnosti javi se organizatoru Cataleya Cupa.</p>
     </div>

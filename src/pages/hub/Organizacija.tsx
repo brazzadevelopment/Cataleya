@@ -198,7 +198,7 @@ function NewTournament({ org, list, onClose }: { org: Session; list: Tournament[
     <Sheet title="Novi turnir" onClose={onClose}>
       <div className="space-y-3">
         <Field label="Naziv"><Input value={name} placeholder="npr. Cataleya Cup Zima 2027" onChange={(e) => { setName(e.target.value); if (!slugTouched) setSlug(slugify(e.target.value)); }} /></Field>
-        <Field label="Adresa turnira" hint={`cataleya-seven.vercel.app/t/${slug || '…'}`}>
+        <Field label="Adresa turnira" hint={`cataleya.klubapp.hr/t/${slug || '…'}`}>
           <Input value={slug} onChange={(e) => { setSlugTouched(true); setSlug(slugify(e.target.value)); }} />
         </Field>
         <div className="grid grid-cols-2 gap-3">

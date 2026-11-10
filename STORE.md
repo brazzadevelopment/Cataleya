@@ -8,7 +8,7 @@ nakon `npm run app:sync` vrijedi i u aplikacijama.
 - Naziv: **Cataleya Cup**
 - Ikona i početni ekran: `assets/` (bijeli cvijet na zelenoj #019C61);
   nakon promjene `npx @capacitor/assets generate`.
-- Pravila privatnosti: https://cataleya-seven.vercel.app/privatnost
+- Pravila privatnosti: https://cataleya.klubapp.hr/privatnost
 
 ## 1. Računi (napravi odmah, traje)
 

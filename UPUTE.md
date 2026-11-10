@@ -22,7 +22,17 @@ npm run dev        # http://localhost:5173
 Demo PIN-ovi: **9000** (organizator), a tereni redom **1001** do **1011** (popis je na ekranu Prijava).
 U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezultate pa se vide tablice i ždrijeb. Gumb „Vrati početno stanje” sve vraća.
 
-## 2. Postavljanje (Supabase + Vercel)
+## 2. Postavljanje
+
+**Od 10. 11. 2026. Cataleya radi na našem serveru** (Hostinger VPS, Coolify `https://server.klubapp.hr`, projekt „Cataleya Cup”, servis `cataleya`):
+
+- baza: `https://baza-cataleya.klubapp.hr` (isti „stan” kao baze KlubApp klubova: svoj Postgres, prijava, datoteke, rezultati uživo, svoji ključevi);
+- server za PIN-ove i obavijesti: `https://baza-cataleya.klubapp.hr/functions/v1/api/…` (Deno, kod iz `supabase/functions/api`);
+- aplikacija: `https://cataleya.klubapp.hr` (gradi se iz repozitorija pri pokretanju servisa).
+
+Sve je u `deploy/coolify.yml`. Grana koda: varijabla `CATALEYA_REF` u Coolifyju (`main`). Nakon spajanja promjena na `main`: Coolify → servis `cataleya` → Restart (api i web povuku novi kod). Promjene baze: `POST https://baza-cataleya.klubapp.hr/rest/v1/rpc/sustav_sql {"q": "…"}` s tajnim ključem stana (Coolify → okolina servisa → `SERVICE_SUPABASESERVICE_KEY`). DNS zapisi su na Vercelu (domena klubapp.hr). Stari Vercel projekt `cataleya` (cataleya-seven.vercel.app) poslužuje istu aplikaciju na isti server.
+
+Ispod je stari postupak (Supabase oblak), samo za povijest.
 
 ### 2.1 Supabase (baza i server)
 

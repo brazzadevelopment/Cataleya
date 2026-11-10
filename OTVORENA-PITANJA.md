@@ -30,7 +30,7 @@ Stanje: 23. 10. 2026. kasno navečer. Kad nešto riješimo, prekriži ili obriš
 
 ## 4. Postavljanje
 
-Gotovo: baza (Supabase), stranica https://cataleya-seven.vercel.app/t/cataleya-cup-2026, glavni PIN i 11 PIN-ova terena.
+Gotovo: baza i stranica na našem serveru (klubapp.hr), https://cataleya.klubapp.hr/t/cataleya-cup-2026, glavni PIN i 11 PIN-ova terena.
 
 | # | Što | Tko |
 |---|---|---|

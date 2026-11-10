@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeAdvancement } from '../src/lib/advancement.js';
 import { authorize, MutationError, ORG_MUTATIONS, type CopyOptions, type Mutation, type NewTournament, type TableName } from '../src/lib/mutations.js';
 import type { Group, GroupTeam, Match, Role, Tournament } from '../src/lib/types.js';
-import { checkSubscribe, type MatchChange, type SubscribeBody } from './notify.js';
+import { checkSubscribe, FCM_PREFIX, type MatchChange, type SubscribeBody } from './notify.js';
 
 export interface TokenData {
   t: string; // tournament id; '*' za organizaciju (svi turniri)
@@ -196,10 +196,10 @@ export async function subscribe(db: SupabaseClient, body: unknown): Promise<Repl
   if (err) return fail(400, err);
   const b = body as SubscribeBody;
   const { error } = await db.from('push_subscriptions').upsert({
-    endpoint: b.subscription.endpoint,
+    endpoint: b.fcmToken ? FCM_PREFIX + b.fcmToken : b.subscription!.endpoint,
     tournament_id: b.tournamentId ?? null,
-    p256dh: b.subscription.keys.p256dh,
-    auth: b.subscription.keys.auth,
+    p256dh: b.fcmToken ? '' : b.subscription!.keys.p256dh,
+    auth: b.fcmToken ? '' : b.subscription!.keys.auth,
     team_ids: b.teamIds,
     club_ids: b.clubIds ?? [],
     events: b.events,
@@ -418,4 +418,5 @@ async function advance(db: SupabaseClient, tournamentId: string, categoryId: str
 
 export { notify, type MatchChange } from './notify.js';
 export type { VapidKeys } from './push.js';
+export type { ServiceAccount } from './fcm.js';
 export { b64urlEncode, rawPublicKey } from './push.js';

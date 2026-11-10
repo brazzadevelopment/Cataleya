@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useFollowedClubs } from '../data/follow';
 import { useOptionalTournament } from '../data/TournamentContext';
 import { ALL_EVENTS, disablePush, enablePush, isIos, pushSupport, readPrefs, syncPush, wrongBrowser, type PushEvent } from '../lib/push';
+import { isNativeApp } from '../lib/native';
 import { BrowserWarning } from './BrowserWarning';
 import { Button, Icon } from './ui';
 
@@ -28,7 +29,7 @@ export function NotificationsCard() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const support = pushSupport();
-  const denied = support === 'ok' && Notification.permission === 'denied';
+  const denied = support === 'ok' && typeof Notification !== 'undefined' && !isNativeApp() && Notification.permission === 'denied';
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);

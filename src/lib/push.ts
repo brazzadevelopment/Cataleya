@@ -2,6 +2,7 @@
 // servisa i javljanje serveru koje momčadi pratimo.
 
 import { source } from '../data/source';
+import { forgetNativeToken, isNativeApp, nativeToken } from './native';
 
 export type PushEvent = 'goal' | 'start' | 'end' | 'card';
 export const ALL_EVENTS: PushEvent[] = ['goal', 'start', 'end', 'card'];
@@ -59,7 +60,7 @@ export function isInAppBrowser(): boolean {
 
 /** Na Androidu treba Chrome; na iPhoneu Safari. Vraća poruku ako je otvoreno u krivom pregledniku. */
 export function wrongBrowser(): 'samsung' | 'inapp' | null {
-  if (isStandalone()) return null;
+  if (isStandalone() || isNativeApp()) return null;
   if (isSamsungBrowser()) return 'samsung';
   if (isInAppBrowser()) return 'inapp';
   return null;
@@ -81,6 +82,7 @@ export function isStandalone(): boolean {
  */
 export function pushSupport(): 'ok' | 'install' | 'unsupported' | 'demo' {
   if (!source.push) return 'demo';
+  if (isNativeApp()) return 'ok';
   if ('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) return 'ok';
   if (isIos() && !isStandalone()) return 'install';
   return 'unsupported';
@@ -91,7 +93,12 @@ function keyBytes(b64url: string): Uint8Array {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
-async function register(f: Follows, events: PushEvent[]): Promise<void> {
+async function register(f: Follows, events: PushEvent[], ask = false): Promise<void> {
+  if (isNativeApp()) {
+    const fcmToken = await nativeToken(ask);
+    if (fcmToken) await source.push!.subscribe({ tournamentId: null, fcmToken, teamIds: f.teamIds, clubIds: f.clubIds, events });
+    return;
+  }
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
@@ -103,18 +110,21 @@ async function register(f: Follows, events: PushEvent[]): Promise<void> {
 
 /** Pita za dopuštenje i uključi obavijesti. Baca grešku s porukom za korisnika. */
 export async function enablePush(f: Follows, events: PushEvent[]): Promise<void> {
-  const perm = await Notification.requestPermission();
-  if (perm !== 'granted') {
-    throw new Error('Obavijesti nisu dopuštene. Dopusti ih u postavkama mobitela pa pokušaj ponovno.');
+  if (!isNativeApp()) {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      throw new Error('Obavijesti nisu dopuštene. Dopusti ih u postavkama mobitela pa pokušaj ponovno.');
+    }
   }
-  await register(f, events);
+  await register(f, events, true);
   writePrefs({ enabled: true, events });
 }
 
 /** Nakon promjene praćenih klubova ili vrsta obavijesti, bez ponovnog pitanja. */
 export async function syncPush(f: Follows, events?: PushEvent[]): Promise<void> {
   const prefs = readPrefs();
-  if (!prefs.enabled || pushSupport() !== 'ok' || Notification.permission !== 'granted') return;
+  if (!prefs.enabled || pushSupport() !== 'ok') return;
+  if (!isNativeApp() && Notification.permission !== 'granted') return;
   const next = { ...prefs, events: events ?? prefs.events };
   await register(f, next.events);
   writePrefs(next);
@@ -122,6 +132,11 @@ export async function syncPush(f: Follows, events?: PushEvent[]): Promise<void> 
 
 export async function disablePush(): Promise<void> {
   writePrefs({ ...readPrefs(), enabled: false });
+  if (isNativeApp()) {
+    const token = await forgetNativeToken();
+    if (token) await source.push?.unsubscribe(`fcm:${token}`).catch(() => undefined);
+    return;
+  }
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (!sub) return;

@@ -3,7 +3,11 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Match } from '../src/lib/types.js';
+import { sendFcm, type ServiceAccount } from './fcm.js';
 import { isPushEndpoint, sendPush, type VapidKeys } from './push.js';
+
+/** Pretplata iz mobilne aplikacije: endpoint je „fcm:” + Firebase token. */
+export const FCM_PREFIX = 'fcm:';
 
 export const PUSH_EVENTS = ['goal', 'start', 'end', 'card'] as const;
 export type PushEvent = (typeof PUSH_EVENTS)[number];
@@ -71,7 +75,7 @@ interface SubRow {
 }
 
 /** Pošalji obavijesti za izmjene; neispravne pretplate obriši. */
-export async function notify(db: SupabaseClient, keys: VapidKeys, tournamentId: string, changes: MatchChange[]): Promise<void> {
+export async function notify(db: SupabaseClient, keys: VapidKeys, tournamentId: string, changes: MatchChange[], fcm: ServiceAccount | null = null): Promise<void> {
   if (!changes.length) return;
   const ids = [...new Set(changes.flatMap((c) => [c.after.home_team_id, c.after.away_team_id]).filter((x): x is string => !!x))];
   if (!ids.length) return;
@@ -103,11 +107,20 @@ export async function notify(db: SupabaseClient, keys: VapidKeys, tournamentId: 
   const gone = new Set<string>();
   const sends: Promise<void>[] = [];
   for (const s of (subs.data ?? []) as SubRow[]) {
-    if (!isPushEndpoint(s.endpoint)) continue;
+    const native = s.endpoint.startsWith(FCM_PREFIX);
+    if (native ? !fcm : !isPushEndpoint(s.endpoint)) continue;
     for (const n of notes) {
       const follows = n.teams.some((t) => s.team_ids.includes(t) || (!!clubOf.get(t) && (s.club_ids ?? []).includes(clubOf.get(t)!)));
       if (!s.events.includes(n.event) || !follows) continue;
       const message = { title: n.title, body: n.body, tag: n.matchId, url: `/t/${slug}/utakmica/${n.matchId}` };
+      if (native) {
+        sends.push(
+          sendFcm(fcm!, s.endpoint.slice(FCM_PREFIX.length), message)
+            .then((r) => void (r === 'gone' && gone.add(s.endpoint)))
+            .catch((e) => console.error('fcm', e)),
+        );
+        continue;
+      }
       sends.push(
         sendPush(s, message, keys, n.matchId.replace(/-/g, ''))
           .then((status) => {
@@ -127,7 +140,10 @@ const B64URL = /^[A-Za-z0-9_-]+$/;
 
 export interface SubscribeBody {
   tournamentId?: string | null;
-  subscription: { endpoint: string; keys: { p256dh: string; auth: string } };
+  /** Preglednik (web push). */
+  subscription?: { endpoint: string; keys: { p256dh: string; auth: string } };
+  /** Mobilna aplikacija (Firebase token). */
+  fcmToken?: string;
   teamIds: string[];
   clubIds?: string[];
   events: PushEvent[];
@@ -137,11 +153,15 @@ export interface SubscribeBody {
 export function checkSubscribe(body: unknown): string | null {
   const b = body as Partial<SubscribeBody> | null;
   if (!b || (b.tournamentId != null && (typeof b.tournamentId !== 'string' || !UUID.test(b.tournamentId)))) return 'Nepoznat turnir.';
-  const s = b.subscription;
-  if (!s || !isPushEndpoint(s.endpoint)) return 'Ovaj preglednik ne podržava obavijesti.';
-  const { p256dh, auth } = s.keys ?? ({} as { p256dh?: string; auth?: string });
-  if (typeof p256dh !== 'string' || !B64URL.test(p256dh) || p256dh.length !== 87) return 'Neispravna pretplata.';
-  if (typeof auth !== 'string' || !B64URL.test(auth) || auth.length !== 22) return 'Neispravna pretplata.';
+  if (b.fcmToken !== undefined) {
+    if (typeof b.fcmToken !== 'string' || !/^[A-Za-z0-9:_-]{20,4096}$/.test(b.fcmToken)) return 'Neispravna pretplata.';
+  } else {
+    const s = b.subscription;
+    if (!s || !isPushEndpoint(s.endpoint)) return 'Ovaj preglednik ne podržava obavijesti.';
+    const { p256dh, auth } = s.keys ?? ({} as { p256dh?: string; auth?: string });
+    if (typeof p256dh !== 'string' || !B64URL.test(p256dh) || p256dh.length !== 87) return 'Neispravna pretplata.';
+    if (typeof auth !== 'string' || !B64URL.test(auth) || auth.length !== 22) return 'Neispravna pretplata.';
+  }
   if (!Array.isArray(b.teamIds) || b.teamIds.length > 60 || !b.teamIds.every((t) => typeof t === 'string' && UUID.test(t))) return 'Neispravan popis momčadi.';
   if (b.clubIds != null && (!Array.isArray(b.clubIds) || b.clubIds.length > 100 || !b.clubIds.every((t) => typeof t === 'string' && UUID.test(t)))) return 'Neispravan popis klubova.';
   if (!Array.isArray(b.events) || !b.events.every((e) => (PUSH_EVENTS as readonly string[]).includes(e))) return 'Neispravan popis obavijesti.';

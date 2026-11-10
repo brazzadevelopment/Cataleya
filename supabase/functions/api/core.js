@@ -372,9 +372,73 @@ function authorize(m, actor, match) {
   return { ...m, row };
 }
 
+// server/fcm.ts
+var enc = new TextEncoder();
+function b64url(bytes) {
+  const b = typeof bytes === "string" ? enc.encode(bytes) : bytes;
+  let s = "";
+  for (const x of b) s += String.fromCharCode(x);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function pemToDer(pem) {
+  const body = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  return Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+}
+async function serviceAccountJwt(sa, now = Date.now()) {
+  const iat = Math.floor(now / 1e3);
+  const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claims = b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat,
+    exp: iat + 3600
+  }));
+  const key = await crypto.subtle.importKey("pkcs8", pemToDer(sa.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, enc.encode(`${head}.${claims}`)));
+  return `${head}.${claims}.${b64url(sig)}`;
+}
+var cached = null;
+async function accessToken(sa) {
+  if (cached && cached.until > Date.now() + 6e4) return cached.token;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: await serviceAccountJwt(sa) })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.access_token) throw new Error(`Firebase prijava nije uspjela (${res.status})`);
+  cached = { token: data.access_token, until: Date.now() + (data.expires_in ?? 3600) * 1e3 };
+  return data.access_token;
+}
+function fcmPayload(token, m) {
+  return {
+    message: {
+      token,
+      notification: { title: m.title, body: m.body },
+      data: { url: m.url, tag: m.tag },
+      android: { priority: "HIGH", notification: { tag: m.tag, channel_id: "utakmice", color: "#019c61" } },
+      apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", "thread-id": m.tag } } }
+    }
+  };
+}
+async function sendFcm(sa, token, m) {
+  const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${await accessToken(sa)}`, "Content-Type": "application/json" },
+    body: JSON.stringify(fcmPayload(token, m))
+  });
+  if (res.ok) return "ok";
+  if (res.status === 404) return "gone";
+  const text = await res.text().catch(() => "");
+  if (/UNREGISTERED|registration-token-not-registered/.test(text)) return "gone";
+  console.error("fcm", res.status, text.slice(0, 200));
+  return "error";
+}
+
 // server/push.ts
 var subtle = globalThis.crypto.subtle;
-var enc = new TextEncoder();
+var enc2 = new TextEncoder();
 function b64urlEncode(bytes) {
   let s = "";
   for (const b of bytes) s += String.fromCharCode(b);
@@ -420,11 +484,11 @@ async function encryptPayload(payload, sub, opts = {}) {
   const ecdh = new Uint8Array(await subtle.deriveBits({ name: "ECDH", public: uaKey }, senderPrivate, 256));
   const one = new Uint8Array([1]);
   const prkKey = await hmac(authSecret, ecdh);
-  const ikm = await hmac(prkKey, concat(enc.encode("WebPush: info\0"), uaPublic, senderPublic, one));
+  const ikm = await hmac(prkKey, concat(enc2.encode("WebPush: info\0"), uaPublic, senderPublic, one));
   const salt = opts.salt ?? globalThis.crypto.getRandomValues(new Uint8Array(16));
   const prk = await hmac(salt, ikm);
-  const cek = (await hmac(prk, concat(enc.encode("Content-Encoding: aes128gcm\0"), one))).slice(0, 16);
-  const nonce = (await hmac(prk, concat(enc.encode("Content-Encoding: nonce\0"), one))).slice(0, 12);
+  const cek = (await hmac(prk, concat(enc2.encode("Content-Encoding: aes128gcm\0"), one))).slice(0, 16);
+  const nonce = (await hmac(prk, concat(enc2.encode("Content-Encoding: nonce\0"), one))).slice(0, 12);
   const key = await subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
   const cipher = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: nonce }, key, concat(payload, new Uint8Array([2]))));
   const header = new Uint8Array(21);
@@ -434,18 +498,18 @@ async function encryptPayload(payload, sub, opts = {}) {
   return concat(header, senderPublic, cipher);
 }
 async function vapidAuthorization(endpoint, keys, now = Date.now()) {
-  const head = b64urlEncode(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
-  const claims = b64urlEncode(enc.encode(JSON.stringify({
+  const head = b64urlEncode(enc2.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = b64urlEncode(enc2.encode(JSON.stringify({
     aud: new URL(endpoint).origin,
     exp: Math.floor(now / 1e3) + 12 * 3600,
     sub: keys.subject
   })));
   const key = await subtle.importKey("jwk", keys.privateJwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
-  const sig = new Uint8Array(await subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(`${head}.${claims}`)));
+  const sig = new Uint8Array(await subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc2.encode(`${head}.${claims}`)));
   return `vapid t=${head}.${claims}.${b64urlEncode(sig)}, k=${b64urlEncode(rawPublicKey(keys.privateJwk))}`;
 }
 async function sendPush(sub, message, keys, topic) {
-  const body = await encryptPayload(enc.encode(JSON.stringify(message)), sub);
+  const body = await encryptPayload(enc2.encode(JSON.stringify(message)), sub);
   const res = await fetch(sub.endpoint, {
     method: "POST",
     headers: {
@@ -479,6 +543,7 @@ function isPushEndpoint(endpoint) {
 }
 
 // server/notify.ts
+var FCM_PREFIX = "fcm:";
 var PUSH_EVENTS = ["goal", "start", "end", "card"];
 function scoreLine(m, home, away) {
   const pens = m.home_penalties != null && m.away_penalties != null ? ` (jedanaesterci ${m.home_penalties}:${m.away_penalties})` : "";
@@ -514,7 +579,7 @@ function matchNotes(c, name, where = "") {
   }
   return out;
 }
-async function notify(db, keys, tournamentId, changes) {
+async function notify(db, keys, tournamentId, changes, fcm = null) {
   if (!changes.length) return;
   const ids = [...new Set(changes.flatMap((c) => [c.after.home_team_id, c.after.away_team_id]).filter((x) => !!x))];
   if (!ids.length) return;
@@ -540,11 +605,18 @@ async function notify(db, keys, tournamentId, changes) {
   const gone = /* @__PURE__ */ new Set();
   const sends = [];
   for (const s of subs.data ?? []) {
-    if (!isPushEndpoint(s.endpoint)) continue;
+    const native = s.endpoint.startsWith(FCM_PREFIX);
+    if (native ? !fcm : !isPushEndpoint(s.endpoint)) continue;
     for (const n of notes) {
       const follows = n.teams.some((t) => s.team_ids.includes(t) || !!clubOf.get(t) && (s.club_ids ?? []).includes(clubOf.get(t)));
       if (!s.events.includes(n.event) || !follows) continue;
       const message = { title: n.title, body: n.body, tag: n.matchId, url: `/t/${slug}/utakmica/${n.matchId}` };
+      if (native) {
+        sends.push(
+          sendFcm(fcm, s.endpoint.slice(FCM_PREFIX.length), message).then((r) => void (r === "gone" && gone.add(s.endpoint))).catch((e) => console.error("fcm", e))
+        );
+        continue;
+      }
       sends.push(
         sendPush(s, message, keys, n.matchId.replace(/-/g, "")).then((status) => {
           if (status === 404 || status === 410) gone.add(s.endpoint);
@@ -561,11 +633,15 @@ var B64URL = /^[A-Za-z0-9_-]+$/;
 function checkSubscribe(body) {
   const b = body;
   if (!b || b.tournamentId != null && (typeof b.tournamentId !== "string" || !UUID.test(b.tournamentId))) return "Nepoznat turnir.";
-  const s = b.subscription;
-  if (!s || !isPushEndpoint(s.endpoint)) return "Ovaj preglednik ne podr\u017Eava obavijesti.";
-  const { p256dh, auth } = s.keys ?? {};
-  if (typeof p256dh !== "string" || !B64URL.test(p256dh) || p256dh.length !== 87) return "Neispravna pretplata.";
-  if (typeof auth !== "string" || !B64URL.test(auth) || auth.length !== 22) return "Neispravna pretplata.";
+  if (b.fcmToken !== void 0) {
+    if (typeof b.fcmToken !== "string" || !/^[A-Za-z0-9:_-]{20,4096}$/.test(b.fcmToken)) return "Neispravna pretplata.";
+  } else {
+    const s = b.subscription;
+    if (!s || !isPushEndpoint(s.endpoint)) return "Ovaj preglednik ne podr\u017Eava obavijesti.";
+    const { p256dh, auth } = s.keys ?? {};
+    if (typeof p256dh !== "string" || !B64URL.test(p256dh) || p256dh.length !== 87) return "Neispravna pretplata.";
+    if (typeof auth !== "string" || !B64URL.test(auth) || auth.length !== 22) return "Neispravna pretplata.";
+  }
   if (!Array.isArray(b.teamIds) || b.teamIds.length > 60 || !b.teamIds.every((t) => typeof t === "string" && UUID.test(t))) return "Neispravan popis mom\u010Dadi.";
   if (b.clubIds != null && (!Array.isArray(b.clubIds) || b.clubIds.length > 100 || !b.clubIds.every((t) => typeof t === "string" && UUID.test(t)))) return "Neispravan popis klubova.";
   if (!Array.isArray(b.events) || !b.events.every((e) => PUSH_EVENTS.includes(e))) return "Neispravan popis obavijesti.";
@@ -705,10 +781,10 @@ async function subscribe(db, body) {
   if (err) return fail(400, err);
   const b = body;
   const { error } = await db.from("push_subscriptions").upsert({
-    endpoint: b.subscription.endpoint,
+    endpoint: b.fcmToken ? FCM_PREFIX + b.fcmToken : b.subscription.endpoint,
     tournament_id: b.tournamentId ?? null,
-    p256dh: b.subscription.keys.p256dh,
-    auth: b.subscription.keys.auth,
+    p256dh: b.fcmToken ? "" : b.subscription.keys.p256dh,
+    auth: b.fcmToken ? "" : b.subscription.keys.auth,
     team_ids: b.teamIds,
     club_ids: b.clubIds ?? [],
     events: b.events

@@ -3,10 +3,12 @@
 // Tajna za potpisivanje prijave je u tablici app_secrets (vidi schema.sql).
 // Obavijesti: ključ za potpis (VAPID) server napravi sam pri prvoj upotrebi
 // i spremi u app_secrets ('vapid'); javni dio daje na /push-key.
+// Mobilne aplikacije: tajna funkcije FIREBASE_SERVICE_ACCOUNT (JSON servisnog
+// računa iz Firebase konzole). Bez nje obavijesti idu samo u preglednike.
 // core.js nastaje iz server/core.ts naredbom `npm run build:edge`.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { login, mutate, notify, rawPublicKey, b64urlEncode, subscribe, unsubscribe, upload, type VapidKeys } from './core.js';
+import { login, mutate, notify, rawPublicKey, b64urlEncode, subscribe, unsubscribe, upload, type ServiceAccount, type VapidKeys } from './core.js';
 
 interface Reply {
   status: number;
@@ -43,6 +45,9 @@ async function vapidKeys(): Promise<VapidKeys> {
   return vapid;
 }
 
+const firebaseJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT');
+const firebase: ServiceAccount | null = firebaseJson ? JSON.parse(firebaseJson) : null;
+
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
 /** Obavijesti se šalju nakon odgovora, da zapisničar ne čeka. */
@@ -77,7 +82,7 @@ Deno.serve(async (req) => {
     if (action === 'login') return json(await login(db, s, body));
     if (action === 'mutate') {
       const r = await mutate(db, s, token, body);
-      if (r.changes?.length) later(vapidKeys().then((k) => notify(db, k, r.changes![0].before.tournament_id, r.changes!)));
+      if (r.changes?.length) later(vapidKeys().then((k) => notify(db, k, r.changes![0].before.tournament_id, r.changes!, firebase)));
       return json(r);
     }
     if (action === 'push-key') return json({ status: 200, body: { key: b64urlEncode(rawPublicKey((await vapidKeys()).privateJwk)) } });

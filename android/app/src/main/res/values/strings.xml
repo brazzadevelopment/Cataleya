@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cataleya Cup</string>
+    <string name="title_activity_main">Cataleya Cup</string>
+    <string name="package_name">hr.cataleyacup.app</string>
+    <string name="custom_url_scheme">hr.cataleyacup.app</string>
+</resources>

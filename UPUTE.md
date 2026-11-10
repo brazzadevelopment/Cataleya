@@ -42,6 +42,14 @@ U uređivanju, na dnu stranice, gumb „Izmisli rezultate skupina” popuni rezu
 5. Serverska funkcija (Edge Function `api`): `npm run build:edge`, zatim `supabase functions deploy api --no-verify-jwt`. Ona provjerava PIN i jedina piše u bazu. Ključ `service_role` Supabase joj daje sam; ne upisuje se nigdje.
 6. **Project Settings → API**: zapiši **Project URL** i javni ključ (**publishable** ili **anon public**).
 
+7. **Cataleya Cup kao aplikacija za sve turnire** (klubovi, PIN organizacije, novi turniri): pokreni i `supabase/migrations/002_cataleya_hub.sql`, pa postavi prvi PIN organizacije:
+
+   ```sql
+   select set_org_pin('Vedran', 'XXXX');
+   ```
+
+   Dalje se PIN-ovi organizacije mijenjaju u aplikaciji: ključić gore desno → PIN organizacije → Organizacija → PIN organizacije.
+
 ### 2.2 Vercel (hosting)
 
 1. Na https://vercel.com: **Add New → Project**, odaberi repozitorij `brazzadevelopment/Cataleya`.
@@ -64,7 +72,15 @@ Nakon promjene varijabli treba **Redeploy**, jer se `VITE_` varijable ugrade u a
 - **Prijava** (dno početne) → glavni PIN → otvara se Uređivanje.
 - Na drugom mobitelu otvori početnu, a na prvom u Rezultatima pokreni utakmicu i dodaj gol. Na drugom se rezultat mora pojaviti sam, za sekundu ili dvije.
 
-## 3. Upute za organizatora
+## 3. Organizacija Cataleya Cupa
+
+- **Prijava:** na početnoj Cataleya Cupa ključić gore desno → PIN organizacije. Isti PIN otvara uređivanje svakog turnira.
+- **Novi turnir:** Organizacija → Turniri → Novi turnir. Upiši naziv i datume, odaberi „Kopiraj iz turnira” (godišta, tereni, po želji i momčadi). Turnir je skica dok ga ne objaviš (Uređivanje → Turnir → Turnir je javan). Raspored se ubacuje iz Excela kao i prije.
+- **Klubovi:** Organizacija → Klubovi: naziv, mjesto i grb. Momčad se klubu dodjeljuje u Uređivanje → Momčadi (nove momčadi dobiju klub same, po nazivu).
+- **Kraj turnira:** Uređivanje → Turnir → Zaključi turnir. PIN-ovi terena prestaju vrijediti, a turnir ide među završene.
+- **Mobilne aplikacije:** vidi [STORE.md](STORE.md).
+
+## 3a. Upute za organizatora turnira
 
 **Prijava:** dno početne stranice → **Prijava** → glavni PIN. Gore desno pojavi se gumb olovke, koji vodi na Uređivanje.
 

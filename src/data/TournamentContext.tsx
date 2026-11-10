@@ -2,13 +2,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Mutation } from '../lib/mutations';
 import type { Session, Snapshot } from '../lib/types';
 import { syncPush } from '../lib/push';
+import { setClubFollowed, setOrgSession, useFollowedClubs, useOrgSession } from './follow';
 import { source } from './source';
 
 interface Ctx {
   snap: Snapshot;
   categoryId: string;
   setCategoryId(id: string): void;
+  /** Momčadi koje pratimo: momčadi praćenih klubova i pojedine momčadi bez kluba. */
   favorites: Set<string>;
+  /** Zvjezdica: prati klub momčadi (na svim turnirima); momčad bez kluba prati se sama. */
   toggleFavorite(teamId: string): void;
   session: Session | null;
   setSession(s: Session | null): void;
@@ -69,15 +72,35 @@ function Loaded({ snap, reload, children }: { snap: Snapshot; reload: () => Prom
   const cats = useMemo(() => [...snap.categories].sort((a, b) => a.sort_order - b.sort_order), [snap.categories]);
 
   const [categoryId, setCat] = useState<string>(() => readJson(`turnir.cat.${tid}`, cats[0]?.id ?? ''));
-  const [favorites, setFav] = useState<Set<string>>(() => new Set(readJson<string[]>(`turnir.fav.${tid}`, [])));
-  const [session, setSess] = useState<Session | null>(() => readJson<Session | null>(`turnir.session.${tid}`, null));
+  const [teamFavs, setTeamFavs] = useState<Set<string>>(() => new Set(readJson<string[]>(`turnir.fav.${tid}`, [])));
+  const [ownSession, setSess] = useState<Session | null>(() => readJson<Session | null>(`turnir.session.${tid}`, null));
+  const org = useOrgSession();
+  const clubs = useFollowedClubs();
+  // Organizacija je u svakom turniru kao organizator turnira.
+  const session: Session | null = ownSession ?? (org ? { ...org, tournamentId: tid, role: 'owner' } : null);
 
   const validCat = cats.some((c) => c.id === categoryId) ? categoryId : cats[0]?.id ?? '';
+  const clubOf = useMemo(() => new Map(snap.teams.map((t) => [t.id, t.club_id ?? null])), [snap.teams]);
 
-  // Server mora znati koje momčadi pratimo, ako su obavijesti uključene.
+  // Starije verzije pamtile su momčadi; momčad s klubom postaje praćeni klub.
   useEffect(() => {
-    syncPush(tid, [...favorites]).catch(() => undefined);
-  }, [tid, favorites]);
+    const moved = [...teamFavs].filter((id) => clubOf.get(id));
+    if (!moved.length) return;
+    for (const id of moved) setClubFollowed(clubOf.get(id)!, true);
+    const rest = [...teamFavs].filter((id) => !clubOf.get(id));
+    setTeamFavs(new Set(rest));
+    writeJson(`turnir.fav.${tid}`, rest);
+  }, [teamFavs, clubOf, tid]);
+
+  const favorites = useMemo(
+    () => new Set(snap.teams.filter((t) => teamFavs.has(t.id) || (t.club_id && clubs.has(t.club_id))).map((t) => t.id)),
+    [snap.teams, teamFavs, clubs],
+  );
+
+  // Server mora znati koje klubove i momčadi pratimo, ako su obavijesti uključene.
+  useEffect(() => {
+    syncPush({ clubIds: [...clubs], teamIds: [...teamFavs] }).catch(() => undefined);
+  }, [clubs, teamFavs]);
 
   const value: Ctx = {
     snap,
@@ -88,7 +111,12 @@ function Loaded({ snap, reload, children }: { snap: Snapshot; reload: () => Prom
     },
     favorites,
     toggleFavorite: (teamId) => {
-      setFav((prev) => {
+      const club = clubOf.get(teamId);
+      if (club) {
+        setClubFollowed(club, !clubs.has(club));
+        return;
+      }
+      setTeamFavs((prev) => {
         const next = new Set(prev);
         if (next.has(teamId)) next.delete(teamId);
         else next.add(teamId);
@@ -98,6 +126,11 @@ function Loaded({ snap, reload, children }: { snap: Snapshot; reload: () => Prom
     },
     session,
     setSession: (s) => {
+      // Odjava organizacije vrijedi za sve turnire.
+      if (!s && !ownSession && org) {
+        setOrgSession(null);
+        return;
+      }
       setSess(s);
       writeJson(`turnir.session.${tid}`, s);
     },
@@ -113,6 +146,11 @@ function Loaded({ snap, reload, children }: { snap: Snapshot; reload: () => Prom
   };
 
   return <TournamentCtx.Provider value={value}>{children}</TournamentCtx.Provider>;
+}
+
+/** Isto kao useTournament, ali vraća null izvan turnira (npr. na početnoj Cataleya Cupa). */
+export function useOptionalTournament(): Ctx | null {
+  return useContext(TournamentCtx);
 }
 
 export function useTournament(): Ctx {

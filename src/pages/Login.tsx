@@ -4,6 +4,7 @@ import { Button, Emblem } from '../components/ui';
 import { source } from '../data/source';
 import { useTournament } from '../data/TournamentContext';
 import { DEMO_PINS } from '../data/seed';
+import { setOrgSession } from '../data/follow';
 
 export function Login() {
   const { snap, session, setSession } = useTournament();
@@ -24,8 +25,13 @@ export function Login() {
         setPin('');
         return;
       }
-      setSession(s);
-      nav(s.role === 'admin' ? `${base}/admin` : `${base}/zapisnik`, { replace: true });
+      if (s.role === 'owner') {
+        // PIN organizacije: vrijedi za sve turnire.
+        setOrgSession({ tournamentId: '', role: 'owner', fieldId: null, token: s.token });
+      } else {
+        setSession(s);
+      }
+      nav(s.role !== 'field' ? `${base}/admin` : `${base}/zapisnik`, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Prijava nije uspjela.');
     } finally {
@@ -36,9 +42,9 @@ export function Login() {
   if (session) {
     return (
       <div className="pt-10 text-center">
-        <p className="text-white/70">Već si prijavljen kao {session.role === 'admin' ? 'organizator' : `zapisničar (${snap.fields.find((f) => f.id === session.fieldId)?.name})`}.</p>
+        <p className="text-white/70">Već si prijavljen kao {session.role === 'owner' ? 'organizacija' : session.role !== 'field' ? 'organizator' : `zapisničar (${snap.fields.find((f) => f.id === session.fieldId)?.name})`}.</p>
         <div className="mt-4 flex justify-center gap-2">
-          <Button onClick={() => nav(session.role === 'admin' ? `${base}/admin` : `${base}/zapisnik`)}>Nastavi</Button>
+          <Button onClick={() => nav(session.role !== 'field' ? `${base}/admin` : `${base}/zapisnik`)}>Nastavi</Button>
           <Button variant="ghost" onClick={() => setSession(null)}>Odjava</Button>
         </div>
       </div>

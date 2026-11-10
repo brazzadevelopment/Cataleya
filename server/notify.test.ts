@@ -48,5 +48,8 @@ describe('pretplata', () => {
     expect(checkSubscribe({ ...ok, events: ['spam'] })).not.toBeNull();
     expect(checkSubscribe({ ...ok, teamIds: ['nije-uuid'] })).not.toBeNull();
     expect(checkSubscribe(null)).not.toBeNull();
+    // klubovi, bez turnira (prati klub na svim turnirima)
+    expect(checkSubscribe({ ...ok, tournamentId: null, clubIds: ['22932050-a898-99b2-bccb-6a14c141e40f'] })).toBeNull();
+    expect(checkSubscribe({ ...ok, clubIds: ['x'] })).not.toBeNull();
   });
 });

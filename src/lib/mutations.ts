@@ -5,7 +5,23 @@
 import { computeAdvancement, type TeamAssignment } from './advancement.js';
 import type { Match, MatchStatus, Role, Snapshot } from './types.js';
 
-export type TableName = 'tournaments' | 'categories' | 'fields' | 'teams' | 'groups' | 'group_teams' | 'matches';
+export type TableName = 'tournaments' | 'categories' | 'fields' | 'teams' | 'groups' | 'group_teams' | 'matches' | 'clubs';
+
+/** Što se kopira iz prethodnog turnira u novi. */
+export interface CopyOptions {
+  categories?: boolean;
+  fields?: boolean;
+  teams?: boolean;
+}
+
+export interface NewTournament {
+  name: string;
+  slug: string;
+  place?: string | null;
+  venue?: string | null;
+  start_date: string;
+  end_date: string;
+}
 
 export interface ScorePatch {
   home_score: number | null;
@@ -23,7 +39,13 @@ export type Mutation =
   | { type: 'score'; matchId: string; patch: ScorePatch }
   | { type: 'upsert'; table: TableName; row: Record<string, unknown> }
   | { type: 'delete'; table: TableName; id: string }
-  | { type: 'setPin'; fieldId: string | null; pin: string };
+  | { type: 'setPin'; fieldId: string | null; pin: string }
+  | { type: 'createTournament'; row: NewTournament; copyFrom?: string | null; copy?: CopyOptions }
+  | { type: 'closeTournament'; reopen?: boolean }
+  | { type: 'setOrgPin'; label: string; pin: string };
+
+/** Izmjene koje ne pripadaju jednom turniru (smije samo organizacija). */
+export const ORG_MUTATIONS = new Set<Mutation['type']>(['createTournament', 'setOrgPin']);
 
 export interface Actor {
   role: Role;
@@ -37,14 +59,43 @@ const EDITABLE: Record<TableName, string[]> = {
     'scorers_enabled', 'is_published'],
   categories: ['id', 'name', 'birth_year', 'match_minutes', 'players_on_field', 'sort_order'],
   fields: ['id', 'name', 'venue', 'maps_url', 'sort_order'],
-  teams: ['id', 'category_id', 'name', 'short_name', 'logo_path'],
+  teams: ['id', 'category_id', 'name', 'short_name', 'logo_path', 'club_id'],
   groups: ['id', 'category_id', 'name', 'sort_order'],
   group_teams: ['category_id', 'group_id', 'team_id', 'lot_rank'],
   matches: ['id', 'category_id', 'stage', 'group_id', 'code', 'label', 'home_team_id', 'away_team_id',
     'home_source', 'away_source', 'field_id', 'starts_at', 'duration_minutes', 'home_score', 'away_score',
     'home_penalties', 'away_penalties', 'status', 'home_yellow', 'away_yellow', 'home_red', 'away_red', 'bracket',
     'winner_place', 'loser_place', 'teams_locked'],
+  clubs: ['id', 'name', 'short_name', 'city', 'logo_path'],
 };
+
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function validateNewTournament(r: NewTournament): void {
+  if (typeof r?.name !== 'string' || r.name.trim().length < 3) throw new MutationError('Upiši naziv turnira.');
+  if (typeof r.slug !== 'string' || !SLUG.test(r.slug) || r.slug.length > 60) {
+    throw new MutationError('Adresa turnira smije imati samo mala slova, brojke i crtice.');
+  }
+  if (!DATE.test(r.start_date) || !DATE.test(r.end_date)) throw new MutationError('Upiši datume turnira.');
+  if (r.end_date < r.start_date) throw new MutationError('Turnir ne može završiti prije nego počne.');
+}
+
+/** Naziv kluba iz naziva momčadi, bez boje dresa (isto kao club_name_of u bazi). */
+export function clubNameOf(team: string): string {
+  return team
+    .replace(/\s+(bijeli|plavi|crveni|crni|žuti|narančasti|zeleni|rumeni|modri)(?=\s|$)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Adresa turnira iz naziva: „Cataleya Cup Zima 2027” → „cataleya-cup-zima-2027”. */
+export function slugify(name: string): string {
+  return name.toLowerCase()
+    .replace(/[čć]/g, 'c').replace(/š/g, 's').replace(/ž/g, 'z').replace(/đ/g, 'd')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
 
 export class MutationError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -84,7 +135,19 @@ export function authorize(m: Mutation, actor: Actor, match?: Pick<Match, 'field_
     const cards = Object.fromEntries(Object.entries({ home_yellow, away_yellow, home_red, away_red }).filter(([, v]) => v !== undefined));
     return { type: 'score', matchId: m.matchId, patch: { home_score, away_score, home_penalties, away_penalties, status, ...cards } };
   }
-  if (actor.role !== 'admin') throw new MutationError('Za ovo treba glavni PIN.', 403);
+  if (actor.role === 'field') throw new MutationError('Za ovo treba glavni PIN.', 403);
+  if (ORG_MUTATIONS.has(m.type) && actor.role !== 'owner') throw new MutationError('Za ovo treba PIN organizacije.', 403);
+  if (m.type === 'createTournament') {
+    validateNewTournament(m.row);
+    const { name, slug, place = null, venue = null, start_date, end_date } = m.row;
+    return { ...m, row: { name: name.trim(), slug, place, venue, start_date, end_date } };
+  }
+  if (m.type === 'setOrgPin') {
+    if (!/^[0-9]{4,8}$/.test(m.pin)) throw new MutationError('PIN mora imati 4 do 8 znamenki.');
+    if (typeof m.label !== 'string' || !m.label.trim() || m.label.length > 40) throw new MutationError('Upiši ime osobe.');
+    return { ...m, label: m.label.trim() };
+  }
+  if (m.type === 'closeTournament') return m;
   if (m.type === 'setPin') {
     if (!/^[0-9]{4,8}$/.test(m.pin)) throw new MutationError('PIN mora imati 4 do 8 znamenki.');
     return m;
@@ -92,6 +155,7 @@ export function authorize(m: Mutation, actor: Actor, match?: Pick<Match, 'field_
   if (!(m.table in EDITABLE)) throw new MutationError('Nepoznata tablica.');
   if (m.type === 'delete') {
     if (m.table === 'tournaments') throw new MutationError('Turnir se ne briše iz aplikacije.', 403);
+    if (m.table === 'clubs' && actor.role !== 'owner') throw new MutationError('Klub briše samo organizacija.', 403);
     return m;
   }
   const allowed = EDITABLE[m.table];
@@ -109,7 +173,8 @@ export function affectedCategories(m: Mutation, s: Snapshot): string[] {
     const match = s.matches.find((x) => x.id === m.matchId);
     return match ? [match.category_id] : [];
   }
-  if (m.type === 'setPin') return [];
+  if (m.type !== 'upsert' && m.type !== 'delete') return [];
+  if (m.table === 'clubs') return [];
   if (m.table === 'tournaments') return s.categories.map((c) => c.id);
   if (m.table === 'matches' || m.table === 'group_teams') {
     const fromRow = m.type === 'upsert' ? (m.row.category_id as string | undefined) : undefined;
@@ -139,7 +204,7 @@ export function advancementFor(s: Snapshot, categoryId: string): TeamAssignment[
 
 const KEY: Record<TableName, keyof Snapshot> = {
   tournaments: 'tournament', categories: 'categories', fields: 'fields', teams: 'teams',
-  groups: 'groups', group_teams: 'groupTeams', matches: 'matches',
+  groups: 'groups', group_teams: 'groupTeams', matches: 'matches', clubs: 'clubs',
 };
 
 function rowKey(table: TableName, row: Record<string, unknown>): string {
@@ -148,7 +213,12 @@ function rowKey(table: TableName, row: Record<string, unknown>): string {
 
 export function applyToSnapshot(s: Snapshot, m: Mutation): Snapshot {
   const next: Snapshot = structuredClone(s);
-  if (m.type === 'setPin') return next;
+  if (m.type === 'setPin' || m.type === 'setOrgPin') return next;
+  if (m.type === 'createTournament') throw new MutationError('Novi turnir se radi samo u pravoj aplikaciji, ne u demo načinu.');
+  if (m.type === 'closeTournament') {
+    next.tournament.closed_at = m.reopen ? null : new Date().toISOString();
+    return next;
+  }
   if (m.type === 'score') {
     const match = next.matches.find((x) => x.id === m.matchId);
     if (match) Object.assign(match, m.patch);

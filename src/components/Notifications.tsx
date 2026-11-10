@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTournament } from '../data/TournamentContext';
+import { useFollowedClubs } from '../data/follow';
+import { useOptionalTournament } from '../data/TournamentContext';
 import { ALL_EVENTS, disablePush, enablePush, isIos, pushSupport, readPrefs, syncPush, wrongBrowser, type PushEvent } from '../lib/push';
 import { BrowserWarning } from './BrowserWarning';
 import { Button, Icon } from './ui';
@@ -11,12 +12,19 @@ const CHOICES: { label: string; events: PushEvent[] }[] = [
   { label: 'Kartoni', events: ['card'] },
 ];
 
-/** Uključivanje i isključivanje obavijesti za omiljene momčadi. */
+/** Klubovi i momčadi koje pratimo (momčadi bez kluba samo unutar turnira). */
+function useFollows() {
+  const t = useOptionalTournament();
+  const clubs = useFollowedClubs();
+  const teamIds = t ? t.snap.teams.filter((x) => !x.club_id && t.favorites.has(x.id)).map((x) => x.id) : [];
+  return { follows: { clubIds: [...clubs], teamIds }, count: clubs.size + teamIds.length };
+}
+
+/** Uključivanje i isključivanje obavijesti za praćene klubove. */
 export function NotificationsCard() {
-  const { snap, favorites } = useTournament();
-  const tid = snap.tournament.id;
-  const guide = `/t/${snap.tournament.slug}/obavijesti`;
-  const [prefs, setPrefs] = useState(() => readPrefs(tid));
+  const { follows, count } = useFollows();
+  const guide = '/obavijesti';
+  const [prefs, setPrefs] = useState(() => readPrefs());
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const support = pushSupport();
@@ -27,7 +35,7 @@ export function NotificationsCard() {
     setMsg(null);
     try {
       await fn();
-      setPrefs(readPrefs(tid));
+      setPrefs(readPrefs());
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Nije uspjelo. Pokušaj ponovno.');
     } finally {
@@ -38,7 +46,7 @@ export function NotificationsCard() {
   const toggle = (events: PushEvent[]) => {
     const on = events.every((e) => prefs.events.includes(e));
     const next = on ? prefs.events.filter((e) => !events.includes(e)) : [...new Set([...prefs.events, ...events])];
-    void run(() => syncPush(tid, [...favorites], next));
+    void run(() => syncPush(follows, next));
   };
 
   return (
@@ -48,7 +56,7 @@ export function NotificationsCard() {
         <div className="flex-1">
           <div className="font-extrabold">Obavijesti na mobitel</div>
           <div className="text-[12px] text-white/60">
-            {prefs.enabled ? `Uključene za ${favorites.size} ${favorites.size === 1 ? 'momčad' : 'momčadi'}` : 'Gol, početak, kraj i kartoni tvojih momčadi'}
+            {prefs.enabled ? `Uključene · pratiš ${count} ${count === 1 ? 'klub' : 'klubova'}` : 'Gol, početak, kraj i kartoni tvojih klubova'}
           </div>
         </div>
       </div>
@@ -81,12 +89,12 @@ export function NotificationsCard() {
 
       {support === 'ok' && !denied && !prefs.enabled && (
         <div className="mt-3">
-          {favorites.size === 0 ? (
+          {count === 0 ? (
             <p className="text-[13px] text-white/70">
-              Prvo označi svoju momčad zvjezdicom <Icon name="star" className="inline size-4 -translate-y-px text-gold" />.
+              Prvo označi svoj klub zvjezdicom <Icon name="star" className="inline size-4 -translate-y-px text-gold" />.
             </p>
           ) : (
-            <Button className="w-full" disabled={busy} onClick={() => void run(() => enablePush(tid, [...favorites], prefs.events.length ? prefs.events : ALL_EVENTS))}>
+            <Button className="w-full" disabled={busy} onClick={() => void run(() => enablePush(follows, prefs.events.length ? prefs.events : ALL_EVENTS))}>
               <Icon name="bell" className="size-5" /> {busy ? 'Uključujem…' : 'Uključi obavijesti'}
             </Button>
           )}
@@ -108,7 +116,7 @@ export function NotificationsCard() {
               </button>
             );
           })}
-          <Button variant="ghost" className="w-full" disabled={busy} onClick={() => void run(() => disablePush(tid))}>
+          <Button variant="ghost" className="w-full" disabled={busy} onClick={() => void run(() => disablePush())}>
             <Icon name="bell-off" className="size-5" /> Isključi obavijesti
           </Button>
         </div>
@@ -124,16 +132,16 @@ export function NotificationsCard() {
 
 /** Kratki poziv na početnoj, dok obavijesti nisu uključene. */
 export function NotifyBanner() {
-  const { snap, favorites } = useTournament();
-  const prefs = readPrefs(snap.tournament.id);
+  const { count } = useFollows();
+  const prefs = readPrefs();
   if (prefs.enabled || pushSupport() === 'demo' || pushSupport() === 'unsupported') return null;
   return (
-    <Link to={`/t/${snap.tournament.slug}/obavijesti`} className="card mt-4 flex items-center gap-3 px-4 py-3">
+    <Link to="/obavijesti" className="card mt-4 flex items-center gap-3 px-4 py-3">
       <Icon name="bell" className="size-6 shrink-0 text-brand-soft" />
       <span className="flex-1 text-[14px] leading-snug">
         <b>Obavijest za svaki gol</b>
         <span className="block text-[12px] text-white/60">
-          {favorites.size ? 'Uključi obavijesti za svoje momčadi' : 'Označi momčad zvjezdicom i uključi obavijesti'}
+          {count ? 'Uključi obavijesti za svoje klubove' : 'Označi svoj klub zvjezdicom i uključi obavijesti'}
         </span>
       </span>
       <Icon name="back" className="size-4 rotate-180 text-white/40" />

@@ -30,7 +30,7 @@ export function ScorerList({ embedded = false }: { embedded?: boolean }) {
           <Icon name="logout" className="size-4" /> Odjava
         </button>
       </div>
-      {session.role === 'admin' && (
+      {session.role !== 'field' && (
         <div className="mt-3 flex flex-wrap gap-2">
           {snap.fields.map((f) => <Chip key={f.id} active={f.id === fieldId} onClick={() => setField(f.id)}>{f.name}</Chip>)}
           {!embedded && <Link to={`${base}/admin`} className="ml-auto self-center text-[12px] font-bold text-brand-soft">Uređivanje →</Link>}

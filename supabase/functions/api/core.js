@@ -242,6 +242,7 @@ function computeAdvancement(data) {
 }
 
 // src/lib/mutations.ts
+var ORG_MUTATIONS = /* @__PURE__ */ new Set(["createTournament", "setOrgPin"]);
 var EDITABLE = {
   tournaments: [
     "name",
@@ -264,7 +265,7 @@ var EDITABLE = {
   ],
   categories: ["id", "name", "birth_year", "match_minutes", "players_on_field", "sort_order"],
   fields: ["id", "name", "venue", "maps_url", "sort_order"],
-  teams: ["id", "category_id", "name", "short_name", "logo_path"],
+  teams: ["id", "category_id", "name", "short_name", "logo_path", "club_id"],
   groups: ["id", "category_id", "name", "sort_order"],
   group_teams: ["category_id", "group_id", "team_id", "lot_rank"],
   matches: [
@@ -294,8 +295,19 @@ var EDITABLE = {
     "winner_place",
     "loser_place",
     "teams_locked"
-  ]
+  ],
+  clubs: ["id", "name", "short_name", "city", "logo_path"]
 };
+var SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+var DATE = /^\d{4}-\d{2}-\d{2}$/;
+function validateNewTournament(r) {
+  if (typeof r?.name !== "string" || r.name.trim().length < 3) throw new MutationError("Upi\u0161i naziv turnira.");
+  if (typeof r.slug !== "string" || !SLUG.test(r.slug) || r.slug.length > 60) {
+    throw new MutationError("Adresa turnira smije imati samo mala slova, brojke i crtice.");
+  }
+  if (!DATE.test(r.start_date) || !DATE.test(r.end_date)) throw new MutationError("Upi\u0161i datume turnira.");
+  if (r.end_date < r.start_date) throw new MutationError("Turnir ne mo\u017Ee zavr\u0161iti prije nego po\u010Dne.");
+}
 var MutationError = class extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -328,7 +340,19 @@ function authorize(m, actor, match) {
     const cards = Object.fromEntries(Object.entries({ home_yellow, away_yellow, home_red, away_red }).filter(([, v]) => v !== void 0));
     return { type: "score", matchId: m.matchId, patch: { home_score, away_score, home_penalties, away_penalties, status, ...cards } };
   }
-  if (actor.role !== "admin") throw new MutationError("Za ovo treba glavni PIN.", 403);
+  if (actor.role === "field") throw new MutationError("Za ovo treba glavni PIN.", 403);
+  if (ORG_MUTATIONS.has(m.type) && actor.role !== "owner") throw new MutationError("Za ovo treba PIN organizacije.", 403);
+  if (m.type === "createTournament") {
+    validateNewTournament(m.row);
+    const { name, slug, place = null, venue = null, start_date, end_date } = m.row;
+    return { ...m, row: { name: name.trim(), slug, place, venue, start_date, end_date } };
+  }
+  if (m.type === "setOrgPin") {
+    if (!/^[0-9]{4,8}$/.test(m.pin)) throw new MutationError("PIN mora imati 4 do 8 znamenki.");
+    if (typeof m.label !== "string" || !m.label.trim() || m.label.length > 40) throw new MutationError("Upi\u0161i ime osobe.");
+    return { ...m, label: m.label.trim() };
+  }
+  if (m.type === "closeTournament") return m;
   if (m.type === "setPin") {
     if (!/^[0-9]{4,8}$/.test(m.pin)) throw new MutationError("PIN mora imati 4 do 8 znamenki.");
     return m;
@@ -336,6 +360,7 @@ function authorize(m, actor, match) {
   if (!(m.table in EDITABLE)) throw new MutationError("Nepoznata tablica.");
   if (m.type === "delete") {
     if (m.table === "tournaments") throw new MutationError("Turnir se ne bri\u0161e iz aplikacije.", 403);
+    if (m.table === "clubs" && actor.role !== "owner") throw new MutationError("Klub bri\u0161e samo organizacija.", 403);
     return m;
   }
   const allowed = EDITABLE[m.table];
@@ -493,15 +518,18 @@ async function notify(db, keys, tournamentId, changes) {
   if (!changes.length) return;
   const ids = [...new Set(changes.flatMap((c) => [c.after.home_team_id, c.after.away_team_id]).filter((x) => !!x))];
   if (!ids.length) return;
-  const [teams, fields, cats, tour, subs] = await Promise.all([
-    db.from("teams").select("id, name").in("id", ids),
+  const [teams, fields, cats, tour] = await Promise.all([
+    db.from("teams").select("id, name, club_id").in("id", ids),
     db.from("fields").select("id, name").eq("tournament_id", tournamentId),
     db.from("categories").select("id, name").eq("tournament_id", tournamentId),
-    db.from("tournaments").select("slug").eq("id", tournamentId).single(),
-    db.from("push_subscriptions").select("endpoint, p256dh, auth, team_ids, events").eq("tournament_id", tournamentId).overlaps("team_ids", ids)
+    db.from("tournaments").select("slug").eq("id", tournamentId).single()
   ]);
+  const teamRows = teams.data ?? [];
+  const clubOf = new Map(teamRows.map((t) => [t.id, t.club_id]));
+  const clubIds = [...new Set(teamRows.map((t) => t.club_id).filter((x) => !!x))];
+  const subs = await db.from("push_subscriptions").select("endpoint, p256dh, auth, team_ids, club_ids, events").or([`team_ids.ov.{${ids.join(",")}}`, ...clubIds.length ? [`club_ids.ov.{${clubIds.join(",")}}`] : []].join(","));
   if (subs.error) throw subs.error;
-  const names = new Map((teams.data ?? []).map((t) => [t.id, t.name]));
+  const names = new Map(teamRows.map((t) => [t.id, t.name]));
   const fieldName = new Map((fields.data ?? []).map((f) => [f.id, f.name]));
   const catName = new Map((cats.data ?? []).map((c) => [c.id, c.name]));
   const slug = tour.data?.slug ?? "";
@@ -514,7 +542,8 @@ async function notify(db, keys, tournamentId, changes) {
   for (const s of subs.data ?? []) {
     if (!isPushEndpoint(s.endpoint)) continue;
     for (const n of notes) {
-      if (!s.events.includes(n.event) || !n.teams.some((t) => s.team_ids.includes(t))) continue;
+      const follows = n.teams.some((t) => s.team_ids.includes(t) || !!clubOf.get(t) && (s.club_ids ?? []).includes(clubOf.get(t)));
+      if (!s.events.includes(n.event) || !follows) continue;
       const message = { title: n.title, body: n.body, tag: n.matchId, url: `/t/${slug}/utakmica/${n.matchId}` };
       sends.push(
         sendPush(s, message, keys, n.matchId.replace(/-/g, "")).then((status) => {
@@ -531,13 +560,14 @@ var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 var B64URL = /^[A-Za-z0-9_-]+$/;
 function checkSubscribe(body) {
   const b = body;
-  if (!b || typeof b.tournamentId !== "string" || !UUID.test(b.tournamentId)) return "Nepoznat turnir.";
+  if (!b || b.tournamentId != null && (typeof b.tournamentId !== "string" || !UUID.test(b.tournamentId))) return "Nepoznat turnir.";
   const s = b.subscription;
   if (!s || !isPushEndpoint(s.endpoint)) return "Ovaj preglednik ne podr\u017Eava obavijesti.";
   const { p256dh, auth } = s.keys ?? {};
   if (typeof p256dh !== "string" || !B64URL.test(p256dh) || p256dh.length !== 87) return "Neispravna pretplata.";
   if (typeof auth !== "string" || !B64URL.test(auth) || auth.length !== 22) return "Neispravna pretplata.";
   if (!Array.isArray(b.teamIds) || b.teamIds.length > 60 || !b.teamIds.every((t) => typeof t === "string" && UUID.test(t))) return "Neispravan popis mom\u010Dadi.";
+  if (b.clubIds != null && (!Array.isArray(b.clubIds) || b.clubIds.length > 100 || !b.clubIds.every((t) => typeof t === "string" && UUID.test(t)))) return "Neispravan popis klubova.";
   if (!Array.isArray(b.events) || !b.events.every((e) => PUSH_EVENTS.includes(e))) return "Neispravan popis obavijesti.";
   return null;
 }
@@ -567,41 +597,80 @@ function verifyToken(secret, token) {
   }
 }
 async function pinStillValid(db, s) {
-  const { data } = await db.from("pins").select("updated_at").eq("id", s.p).eq("tournament_id", s.t).maybeSingle();
+  const { data } = s.r === "owner" ? await db.from("org_pins").select("updated_at").eq("id", s.p).maybeSingle() : await db.from("pins").select("updated_at").eq("id", s.p).eq("tournament_id", s.t).maybeSingle();
   return !!data && new Date(data.updated_at).getTime() === new Date(s.v).getTime();
 }
 var isUuid = (s) => typeof s === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+async function checkPin(db, tournamentId, pin) {
+  const { data, error } = await db.rpc("check_pin", { p_tournament_id: tournamentId, p_pin: pin });
+  if (error) throw error;
+  return data[0] ?? null;
+}
 async function login(db, secret, body) {
   const { tournamentId, pin } = body ?? {};
-  if (!isUuid(tournamentId) || typeof pin !== "string" || !/^[0-9]{4,8}$/.test(pin)) {
+  if (typeof pin !== "string" || !/^[0-9]{4,8}$/.test(pin) || tournamentId != null && !isUuid(tournamentId)) {
     return fail(401, "PIN nije to\u010Dan.");
   }
-  const { data, error } = await db.rpc("check_pin", { p_tournament_id: tournamentId, p_pin: pin });
-  if (error) {
-    console.error(error);
+  try {
+    if (isUuid(tournamentId)) {
+      const { data: t } = await db.from("tournaments").select("slug, closed_at").eq("id", tournamentId).maybeSingle();
+      const tour = t;
+      const match = tour ? await checkPin(db, tournamentId, pin) : null;
+      if (match) {
+        if (tour.closed_at && match.role === "field") return fail(403, "Turnir je zavr\u0161en. PIN terena vi\u0161e ne vrijedi.");
+        const token = signToken(secret, { t: tournamentId, r: match.role, f: match.field_id, p: match.id, v: match.updated_at });
+        return { status: 200, body: { tournamentId, slug: tour.slug, role: match.role, fieldId: match.field_id, token } };
+      }
+    }
+    const { data: org, error } = await db.rpc("check_org_pin", { p_pin: pin });
+    if (error) throw error;
+    const o = org[0];
+    if (o) {
+      const token = signToken(secret, { t: "*", r: "owner", f: null, p: o.id, v: o.updated_at });
+      return { status: 200, body: { tournamentId: isUuid(tournamentId) ? tournamentId : null, role: "owner", fieldId: null, token } };
+    }
+    if (isUuid(tournamentId)) return fail(401, "PIN nije to\u010Dan.");
+    const { data: open } = await db.from("tournaments").select("id, slug").is("closed_at", null).order("start_date", { ascending: false });
+    for (const t of open ?? []) {
+      const match = await checkPin(db, t.id, pin);
+      if (match) {
+        const token = signToken(secret, { t: t.id, r: match.role, f: match.field_id, p: match.id, v: match.updated_at });
+        return { status: 200, body: { tournamentId: t.id, slug: t.slug, role: match.role, fieldId: match.field_id, token } };
+      }
+    }
+    return fail(401, "PIN nije to\u010Dan.");
+  } catch (e) {
+    console.error(e);
     return fail(500, "Prijava trenutno ne radi. Poku\u0161aj ponovno.");
   }
-  const match = data[0];
-  if (!match) return fail(401, "PIN nije to\u010Dan.");
-  const token = signToken(secret, { t: tournamentId, r: match.role, f: match.field_id, p: match.id, v: match.updated_at });
-  return { status: 200, body: { tournamentId, role: match.role, fieldId: match.field_id, token } };
 }
 async function mutate(db, secret, token, body) {
   const session = verifyToken(secret, token);
   if (!session) return fail(401, "Prijava je istekla. Upi\u0161i PIN ponovno.");
-  const mutations = body?.mutations;
+  const { mutations, tournamentId } = body ?? {};
   if (!Array.isArray(mutations) || mutations.length === 0 || mutations.length > 300) {
     return fail(400, "Neispravan zahtjev.");
   }
   if (!await pinStillValid(db, session)) return fail(401, "PIN je promijenjen. Upi\u0161i novi PIN.");
+  let s = session;
+  if (session.r === "owner") {
+    const needsTournament = mutations.some((m) => !ORG_MUTATIONS.has(m?.type) && !(m?.type !== "score" && "table" in m && m.table === "clubs"));
+    if (needsTournament) {
+      if (!isUuid(tournamentId)) return fail(400, "Odaberi turnir.");
+      const { data } = await db.from("tournaments").select("id").eq("id", tournamentId).maybeSingle();
+      if (!data) return fail(404, "Turnir ne postoji.");
+      s = { ...session, t: tournamentId };
+    }
+  }
   const categories = /* @__PURE__ */ new Set();
   const changes = [];
+  const out = {};
   try {
     for (const raw of mutations) {
-      for (const c of await apply(db, session, raw, changes)) categories.add(c);
+      for (const c of await apply(db, s, raw, changes, out)) categories.add(c);
     }
-    for (const c of categories) await advance(db, session.t, c);
-    return { status: 200, body: { ok: true }, changes };
+    for (const c of categories) await advance(db, s.t, c);
+    return { status: 200, body: { ok: true, ...out }, changes };
   } catch (e) {
     if (e instanceof MutationError) return fail(e.status, e.message);
     console.error(e);
@@ -615,7 +684,7 @@ var MAX_UPLOAD = 3 * 1024 * 1024;
 async function upload(db, secret, token, body) {
   const s = verifyToken(secret, token);
   if (!s) return fail(401, "Prijava je istekla. Upi\u0161i PIN ponovno.");
-  if (s.r !== "admin") return fail(403, "Za ovo treba glavni PIN.");
+  if (s.r !== "admin" && s.r !== "owner") return fail(403, "Za ovo treba glavni PIN.");
   const { type, data } = body ?? {};
   const ext = type ? TYPES[type] : void 0;
   const base64 = typeof data === "string" ? data.replace(/^data:[^;]+;base64,/, "") : "";
@@ -623,7 +692,7 @@ async function upload(db, secret, token, body) {
   const bytes = Buffer.from(base64, "base64");
   if (bytes.length > MAX_UPLOAD) return fail(400, "Slika je ve\u0107a od 3 MB.");
   if (!await pinStillValid(db, s)) return fail(401, "PIN je promijenjen. Upi\u0161i novi PIN.");
-  const path = `${s.t}/${crypto.randomUUID()}.${ext}`;
+  const path = `${s.t === "*" ? "klubovi" : s.t}/${crypto.randomUUID()}.${ext}`;
   const { error } = await db.storage.from("logos").upload(path, bytes, { contentType: type, upsert: false });
   if (error) {
     console.error(error);
@@ -637,10 +706,11 @@ async function subscribe(db, body) {
   const b = body;
   const { error } = await db.from("push_subscriptions").upsert({
     endpoint: b.subscription.endpoint,
-    tournament_id: b.tournamentId,
+    tournament_id: b.tournamentId ?? null,
     p256dh: b.subscription.keys.p256dh,
     auth: b.subscription.keys.auth,
     team_ids: b.teamIds,
+    club_ids: b.clubIds ?? [],
     events: b.events
   }, { onConflict: "endpoint" });
   if (error) {
@@ -660,7 +730,7 @@ async function unsubscribe(db, body) {
   return { status: 200, body: { ok: true } };
 }
 var KEY = { group_teams: "team_id" };
-async function apply(db, s, raw, changes) {
+async function apply(db, s, raw, changes, out) {
   const actor = { role: s.r, fieldId: s.f };
   if (raw.type === "score") {
     const { data: match } = await db.from("matches").select("*").eq("id", raw.matchId).eq("tournament_id", s.t).maybeSingle();
@@ -673,6 +743,32 @@ async function apply(db, s, raw, changes) {
     return [before.category_id];
   }
   const m = authorize(raw, actor);
+  if (m.type === "createTournament") {
+    out.created = await createTournament(db, m.row, m.copyFrom ?? null, m.copy ?? {});
+    return [];
+  }
+  if (m.type === "setOrgPin") {
+    const { error: error2 } = await db.rpc("set_org_pin", { p_label: m.label, p_pin: m.pin });
+    if (error2) throw new MutationError(error2.message.includes("ve\u0107 koristi") ? "Taj PIN ve\u0107 koristi netko drugi." : "PIN nije spremljen.");
+    return [];
+  }
+  if (m.type === "closeTournament") {
+    const { error: error2 } = await db.from("tournaments").update({ closed_at: m.reopen ? null : (/* @__PURE__ */ new Date()).toISOString() }).eq("id", s.t);
+    if (error2) throw error2;
+    if (!m.reopen) await db.from("pins").delete().eq("tournament_id", s.t).eq("role", "field");
+    return [];
+  }
+  if ((m.type === "upsert" || m.type === "delete") && m.table === "clubs") {
+    if (m.type === "delete") {
+      const { error: error3 } = await db.from("clubs").delete().eq("id", m.id);
+      if (error3) throw error3;
+      return [];
+    }
+    if (typeof m.row.name !== "string" || !m.row.name.trim()) throw new MutationError("Upi\u0161i naziv kluba.");
+    const { error: error2 } = await db.from("clubs").upsert({ ...m.row, name: m.row.name.trim() }, { onConflict: "id" });
+    if (error2) throw error2;
+    return [];
+  }
   if (m.type === "setPin") {
     if (m.fieldId) await ensureOwn(db, "fields", "id", m.fieldId, s.t);
     const { error: error2 } = await db.rpc("set_pin", { p_tournament_id: s.t, p_field_id: m.fieldId, p_pin: m.pin });
@@ -713,6 +809,65 @@ async function apply(db, s, raw, changes) {
     return data ? [data.category_id] : [];
   }
   return [];
+}
+async function createTournament(db, row, copyFrom, copy) {
+  const { data: taken } = await db.from("tournaments").select("id").eq("slug", row.slug).maybeSingle();
+  if (taken) throw new MutationError("Turnir s tom adresom ve\u0107 postoji.", 409);
+  let base = {};
+  if (copyFrom) {
+    if (!isUuid(copyFrom)) throw new MutationError("Nepoznat turnir za kopiranje.");
+    const { data } = await db.from("tournaments").select("*").eq("id", copyFrom).maybeSingle();
+    if (!data) throw new MutationError("Nepoznat turnir za kopiranje.");
+    base = data;
+  }
+  const { data: created, error } = await db.from("tournaments").insert({
+    ...row,
+    timezone: base.timezone ?? "Europe/Zagreb",
+    logo_path: base.logo_path ?? null,
+    color_primary: base.color_primary ?? "#019c61",
+    color_secondary: base.color_secondary ?? "#061a10",
+    description: base.description ?? null,
+    rules: base.rules ?? null,
+    points_win: base.points_win ?? 3,
+    points_draw: base.points_draw ?? 1,
+    points_loss: base.points_loss ?? 0,
+    tiebreakers: base.tiebreakers ?? ["head_to_head", "goal_difference", "goals_for", "fewer_goals_against", "fewer_cards", "lot"],
+    scorers_enabled: base.scorers_enabled ?? false,
+    is_published: false
+  }).select("id, slug").single();
+  if (error) throw error;
+  const t = created;
+  if (!copyFrom) return t;
+  const catMap = /* @__PURE__ */ new Map();
+  if (copy.categories || copy.teams) {
+    const { data: cats } = await db.from("categories").select("*").eq("tournament_id", copyFrom);
+    const rows = (cats ?? []).map((c) => {
+      const id = crypto.randomUUID();
+      catMap.set(c.id, id);
+      return { id, tournament_id: t.id, name: c.name, birth_year: c.birth_year, match_minutes: c.match_minutes, players_on_field: c.players_on_field, sort_order: c.sort_order };
+    });
+    if (rows.length) {
+      const { error: e } = await db.from("categories").insert(rows);
+      if (e) throw e;
+    }
+  }
+  if (copy.fields) {
+    const { data: fields } = await db.from("fields").select("name, venue, maps_url, sort_order").eq("tournament_id", copyFrom);
+    const rows = (fields ?? []).map((f) => ({ ...f, tournament_id: t.id }));
+    if (rows.length) {
+      const { error: e } = await db.from("fields").insert(rows);
+      if (e) throw e;
+    }
+  }
+  if (copy.teams) {
+    const { data: teams } = await db.from("teams").select("category_id, name, short_name, logo_path, club_id").eq("tournament_id", copyFrom);
+    const rows = (teams ?? []).filter((x) => catMap.has(x.category_id)).map((x) => ({ ...x, category_id: catMap.get(x.category_id), tournament_id: t.id }));
+    if (rows.length) {
+      const { error: e } = await db.from("teams").insert(rows);
+      if (e) throw e;
+    }
+  }
+  return t;
 }
 async function ensureOwn(db, table, key, id, tournamentId) {
   const { data } = await db.from(table).select("tournament_id").eq(key, id).maybeSingle();

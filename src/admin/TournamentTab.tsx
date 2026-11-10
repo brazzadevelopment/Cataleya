@@ -102,14 +102,39 @@ export function TournamentTab() {
       </Field>
 
       <label className="flex items-center gap-3 text-[14px] font-semibold">
-        <input type="checkbox" checked={t.is_published} onChange={(e) => set('is_published', e.target.checked)} className="size-5 accent-[#f2c230]" />
-        Turnir je javan (vidljiv na popisu turnira)
+        <input type="checkbox" checked={t.is_published} onChange={(e) => set('is_published', e.target.checked)} className="size-5 accent-[#019c61]" />
+        Turnir je javan (vidljiv na početnoj Cataleya Cupa)
       </label>
+
+      <CloseTournament />
 
       <div className="sticky bottom-3 flex items-center gap-3 rounded-2xl bg-pitch-950/90 p-2 backdrop-blur">
         <Button type="submit" disabled={busy}>Spremi</Button>
         <Status status={status} />
       </div>
     </form>
+  );
+}
+
+/** Kraj turnira: PIN-ovi terena prestaju vrijediti, turnir ide u završene. */
+function CloseTournament() {
+  const { snap } = useTournament();
+  const { save, status, busy } = useSave();
+  const closed = !!snap.tournament.closed_at;
+  return (
+    <div className="card p-4">
+      <h3 className="font-extrabold">{closed ? 'Turnir je zaključen' : 'Zaključi turnir'}</h3>
+      <p className="mt-1 text-[13px] leading-relaxed text-white/65">
+        {closed
+          ? 'PIN-ovi terena ne vrijede, a turnir je među završenima. Rezultati i dalje mogu ići ispravci glavnim PIN-om.'
+          : 'Kad je sve odigrano: PIN-ovi terena prestaju vrijediti, a turnir prelazi među završene turnire s pobjednicima.'}
+      </p>
+      <div className="mt-3 flex items-center gap-3">
+        <Button type="button" variant={closed ? 'ghost' : 'danger'} disabled={busy} onClick={() => {
+          if (closed || confirm('Zaključiti turnir? PIN-ovi terena bit će obrisani.')) void save([{ type: 'closeTournament', reopen: closed }], closed ? 'Turnir je ponovno otvoren' : 'Turnir je zaključen');
+        }}>{closed ? 'Ponovno otvori' : 'Zaključi turnir'}</Button>
+        <Status status={status} />
+      </div>
+    </div>
   );
 }

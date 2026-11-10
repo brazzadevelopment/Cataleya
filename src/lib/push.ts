@@ -11,24 +11,36 @@ export interface PushPrefs {
   events: PushEvent[];
 }
 
-const key = (tid: string) => `turnir.push.${tid}`;
+// Postavke vrijede za sve turnire (prati se klub, ne jedan turnir).
+const KEY = 'cataleya.push';
 
-export function readPrefs(tid: string): PushPrefs {
+export function readPrefs(): PushPrefs {
   try {
-    const raw = localStorage.getItem(key(tid));
+    const raw = localStorage.getItem(KEY);
     if (raw) return JSON.parse(raw) as PushPrefs;
+    // Starije verzije pamtile su postavke po turniru.
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('turnir.push.')) return JSON.parse(localStorage.getItem(k)!) as PushPrefs;
+    }
   } catch {
     // bez pohrane: obavijesti nisu uključene
   }
   return { enabled: false, events: ALL_EVENTS };
 }
 
-function writePrefs(tid: string, p: PushPrefs): void {
+function writePrefs(p: PushPrefs): void {
   try {
-    localStorage.setItem(key(tid), JSON.stringify(p));
+    localStorage.setItem(KEY, JSON.stringify(p));
   } catch {
     // nema pohrane
   }
+}
+
+/** Što pratimo: klubovi (svi turniri) i pojedine momčadi bez kluba. */
+export interface Follows {
+  clubIds: string[];
+  teamIds: string[];
 }
 
 export function isIos(): boolean {
@@ -79,37 +91,37 @@ function keyBytes(b64url: string): Uint8Array {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
-async function register(tid: string, teamIds: string[], events: PushEvent[]): Promise<void> {
+async function register(f: Follows, events: PushEvent[]): Promise<void> {
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub) {
     const appKey = keyBytes(await source.push!.key());
     sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey as BufferSource });
   }
-  await source.push!.subscribe({ tournamentId: tid, subscription: sub.toJSON(), teamIds, events });
+  await source.push!.subscribe({ tournamentId: null, subscription: sub.toJSON(), teamIds: f.teamIds, clubIds: f.clubIds, events });
 }
 
 /** Pita za dopuštenje i uključi obavijesti. Baca grešku s porukom za korisnika. */
-export async function enablePush(tid: string, teamIds: string[], events: PushEvent[]): Promise<void> {
+export async function enablePush(f: Follows, events: PushEvent[]): Promise<void> {
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') {
     throw new Error('Obavijesti nisu dopuštene. Dopusti ih u postavkama mobitela pa pokušaj ponovno.');
   }
-  await register(tid, teamIds, events);
-  writePrefs(tid, { enabled: true, events });
+  await register(f, events);
+  writePrefs({ enabled: true, events });
 }
 
-/** Nakon promjene omiljenih momčadi ili vrsta obavijesti, bez ponovnog pitanja. */
-export async function syncPush(tid: string, teamIds: string[], events?: PushEvent[]): Promise<void> {
-  const prefs = readPrefs(tid);
+/** Nakon promjene praćenih klubova ili vrsta obavijesti, bez ponovnog pitanja. */
+export async function syncPush(f: Follows, events?: PushEvent[]): Promise<void> {
+  const prefs = readPrefs();
   if (!prefs.enabled || pushSupport() !== 'ok' || Notification.permission !== 'granted') return;
   const next = { ...prefs, events: events ?? prefs.events };
-  await register(tid, teamIds, next.events);
-  writePrefs(tid, next);
+  await register(f, next.events);
+  writePrefs(next);
 }
 
-export async function disablePush(tid: string): Promise<void> {
-  writePrefs(tid, { ...readPrefs(tid), enabled: false });
+export async function disablePush(): Promise<void> {
+  writePrefs({ ...readPrefs(), enabled: false });
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (!sub) return;

@@ -19,7 +19,7 @@ export function Mine() {
         <>
           <SectionTitle>Moje utakmice</SectionTitle>
           <Empty>
-            Još nisi označio nijednu momčad. Odaberi momčad ispod ili dodirni{' '}
+            Još ne pratiš nijedan klub. Odaberi momčad ispod ili dodirni{' '}
             <Icon name="star" className="inline size-4 -translate-y-px text-gold" /> uz njezino ime bilo gdje u aplikaciji.
           </Empty>
           <PickTeams />
@@ -44,7 +44,7 @@ export function Mine() {
           <SectionTitle>Odigrane</SectionTitle>
           {played.length ? <div className="space-y-3">{played.map((m) => <MatchCard key={m.id} match={m} />)}</div> : <Empty>Još nema odigranih utakmica.</Empty>}
 
-          <SectionTitle>Dodaj momčad</SectionTitle>
+          <SectionTitle>Prati još jedan klub</SectionTitle>
           <PickTeams />
         </>
       )}

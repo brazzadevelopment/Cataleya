@@ -1,9 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Icon, SectionTitle } from '../components/ui';
+import { source } from '../data/source';
 import { useTournament } from '../data/TournamentContext';
-import type { Mutation } from '../lib/mutations';
-import type { Category, Team } from '../lib/types';
-import { Field, Input, newId, Sheet, Status, TextArea, useSave } from './kit';
+import { clubNameOf, type Mutation } from '../lib/mutations';
+import type { Category, Club, Team } from '../lib/types';
+import { Field, Input, newId, SelectBox, Sheet, Status, TextArea, useSave } from './kit';
+
+/** Svi klubovi (za dodjelu momčadi klubu). */
+function useAllClubs(): Club[] {
+  const [clubs, setClubs] = useState<Club[]>([]);
+  useEffect(() => {
+    source.listClubs().then(setClubs).catch(() => undefined);
+  }, []);
+  return clubs;
+}
+
+/** Klub za momčad po nazivu („NK Rudeš plavi” → NK Rudeš); ako ne postoji, napravi ga. */
+export function clubFor(teamName: string, clubs: Club[], m: Mutation[]): string {
+  const name = clubNameOf(teamName);
+  const found = clubs.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  if (found) return found.id;
+  const id = newId();
+  m.push({ type: 'upsert', table: 'clubs', row: { id, name } });
+  clubs.push({ id, name, short_name: null, city: null, logo_path: null });
+  return id;
+}
 
 export function TeamsTab() {
   const { snap, categoryId, setCategoryId } = useTournament();
@@ -95,15 +116,27 @@ export function TeamsTab() {
 function TeamEditor({ team, onClose }: { team: Team; onClose(): void }) {
   const [name, setName] = useState(team.name);
   const [short, setShort] = useState(team.short_name ?? '');
+  const [club, setClub] = useState(team.club_id ?? '');
+  const clubs = useAllClubs();
   const { save, status, busy } = useSave();
   return (
     <Sheet title="Momčad" onClose={onClose}>
       <form className="space-y-3" onSubmit={async (e) => {
         e.preventDefault();
-        if (await save([{ type: 'upsert', table: 'teams', row: { id: team.id, category_id: team.category_id, name: name.trim(), short_name: short.trim() || null } }])) onClose();
+        const m: Mutation[] = [];
+        const clubId = club === 'new' ? clubFor(name.trim(), [...clubs], m) : club || null;
+        m.push({ type: 'upsert', table: 'teams', row: { id: team.id, category_id: team.category_id, name: name.trim(), short_name: short.trim() || null, club_id: clubId } });
+        if (await save(m)) onClose();
       }}>
         <Field label="Naziv"><Input value={name} onChange={(e) => setName(e.target.value)} required /></Field>
         <Field label="Kratki naziv (po želji)"><Input value={short} onChange={(e) => setShort(e.target.value)} /></Field>
+        <Field label="Klub" hint="Klub povezuje momčad kroz sve turnire: roditelji ga prate zvjezdicom.">
+          <SelectBox value={club} onChange={(e) => setClub(e.target.value)} options={[
+            ['', 'Bez kluba'],
+            ['new', `+ Novi klub: ${clubNameOf(name.trim() || '…')}`],
+            ...clubs.map((c) => [c.id, c.name] as [string, string]),
+          ]} />
+        </Field>
         <div className="flex items-center gap-2">
           <Button type="submit" disabled={busy}>Spremi</Button>
           <Button variant="danger" disabled={busy} onClick={async () => {
@@ -118,6 +151,7 @@ function TeamEditor({ team, onClose }: { team: Team; onClose(): void }) {
 
 function BulkTeams({ groupId, onClose }: { groupId: string | null; onClose(): void }) {
   const { snap, categoryId } = useTournament();
+  const clubs = useAllClubs();
   const [text, setText] = useState('');
   const { save, status, busy } = useSave();
   return (
@@ -127,14 +161,16 @@ function BulkTeams({ groupId, onClose }: { groupId: string | null; onClose(): vo
         const existing = new Set(snap.teams.filter((t) => t.category_id === categoryId).map((t) => t.name.toLowerCase()));
         const names = [...new Set(text.split('\n').map((s) => s.trim()).filter(Boolean))].filter((n) => !existing.has(n.toLowerCase()));
         const m: Mutation[] = [];
+        const known = [...clubs];
         for (const name of names) {
           const id = newId();
-          m.push({ type: 'upsert', table: 'teams', row: { id, category_id: categoryId, name } });
+          const club_id = clubFor(name, known, m);
+          m.push({ type: 'upsert', table: 'teams', row: { id, category_id: categoryId, name, club_id } });
           if (groupId) m.push({ type: 'upsert', table: 'group_teams', row: { category_id: categoryId, group_id: groupId, team_id: id, lot_rank: null } });
         }
         if (m.length && await save(m, `Dodano ${names.length}.`)) onClose();
       }}>
-        <Field label="Jedna momčad po retku"><TextArea value={text} onChange={(e) => setText(e.target.value)} className="min-h-48" placeholder={'NK Arbanasi\nNK Zagreb'} autoFocus /></Field>
+        <Field label="Jedna momčad po retku" hint="Svaka momčad dobije klub po nazivu (npr. „NK Rudeš plavi” → NK Rudeš). Ako klub ne postoji, napravi se."><TextArea value={text} onChange={(e) => setText(e.target.value)} className="min-h-48" placeholder={'NK Arbanasi\nNK Zagreb'} autoFocus /></Field>
         <div className="flex items-center gap-2"><Button type="submit" disabled={busy}>Dodaj</Button><Status status={status} /></div>
       </form>
     </Sheet>

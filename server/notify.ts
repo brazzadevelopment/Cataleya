@@ -66,6 +66,7 @@ interface SubRow {
   p256dh: string;
   auth: string;
   team_ids: string[];
+  club_ids: string[] | null;
   events: string[];
 }
 
@@ -75,15 +76,20 @@ export async function notify(db: SupabaseClient, keys: VapidKeys, tournamentId: 
   const ids = [...new Set(changes.flatMap((c) => [c.after.home_team_id, c.after.away_team_id]).filter((x): x is string => !!x))];
   if (!ids.length) return;
 
-  const [teams, fields, cats, tour, subs] = await Promise.all([
-    db.from('teams').select('id, name').in('id', ids),
+  const [teams, fields, cats, tour] = await Promise.all([
+    db.from('teams').select('id, name, club_id').in('id', ids),
     db.from('fields').select('id, name').eq('tournament_id', tournamentId),
     db.from('categories').select('id, name').eq('tournament_id', tournamentId),
     db.from('tournaments').select('slug').eq('id', tournamentId).single(),
-    db.from('push_subscriptions').select('endpoint, p256dh, auth, team_ids, events').eq('tournament_id', tournamentId).overlaps('team_ids', ids),
   ]);
+  const teamRows = (teams.data ?? []) as { id: string; name: string; club_id: string | null }[];
+  const clubOf = new Map(teamRows.map((t) => [t.id, t.club_id]));
+  const clubIds = [...new Set(teamRows.map((t) => t.club_id).filter((x): x is string => !!x))];
+  // Pratitelji momčadi ili njezina kluba (klub vrijedi za sve turnire).
+  const subs = await db.from('push_subscriptions').select('endpoint, p256dh, auth, team_ids, club_ids, events')
+    .or([`team_ids.ov.{${ids.join(',')}}`, ...(clubIds.length ? [`club_ids.ov.{${clubIds.join(',')}}`] : [])].join(','));
   if (subs.error) throw subs.error;
-  const names = new Map((teams.data ?? []).map((t: { id: string; name: string }) => [t.id, t.name]));
+  const names = new Map(teamRows.map((t) => [t.id, t.name]));
   const fieldName = new Map((fields.data ?? []).map((f: { id: string; name: string }) => [f.id, f.name]));
   const catName = new Map((cats.data ?? []).map((c: { id: string; name: string }) => [c.id, c.name]));
   const slug = (tour.data as { slug?: string } | null)?.slug ?? '';
@@ -99,7 +105,8 @@ export async function notify(db: SupabaseClient, keys: VapidKeys, tournamentId: 
   for (const s of (subs.data ?? []) as SubRow[]) {
     if (!isPushEndpoint(s.endpoint)) continue;
     for (const n of notes) {
-      if (!s.events.includes(n.event) || !n.teams.some((t) => s.team_ids.includes(t))) continue;
+      const follows = n.teams.some((t) => s.team_ids.includes(t) || (!!clubOf.get(t) && (s.club_ids ?? []).includes(clubOf.get(t)!)));
+      if (!s.events.includes(n.event) || !follows) continue;
       const message = { title: n.title, body: n.body, tag: n.matchId, url: `/t/${slug}/utakmica/${n.matchId}` };
       sends.push(
         sendPush(s, message, keys, n.matchId.replace(/-/g, ''))
@@ -119,22 +126,24 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 
 export interface SubscribeBody {
-  tournamentId: string;
+  tournamentId?: string | null;
   subscription: { endpoint: string; keys: { p256dh: string; auth: string } };
   teamIds: string[];
+  clubIds?: string[];
   events: PushEvent[];
 }
 
 /** Provjera pretplate iz preglednika. Vraća poruku greške ili null. */
 export function checkSubscribe(body: unknown): string | null {
   const b = body as Partial<SubscribeBody> | null;
-  if (!b || typeof b.tournamentId !== 'string' || !UUID.test(b.tournamentId)) return 'Nepoznat turnir.';
+  if (!b || (b.tournamentId != null && (typeof b.tournamentId !== 'string' || !UUID.test(b.tournamentId)))) return 'Nepoznat turnir.';
   const s = b.subscription;
   if (!s || !isPushEndpoint(s.endpoint)) return 'Ovaj preglednik ne podržava obavijesti.';
   const { p256dh, auth } = s.keys ?? ({} as { p256dh?: string; auth?: string });
   if (typeof p256dh !== 'string' || !B64URL.test(p256dh) || p256dh.length !== 87) return 'Neispravna pretplata.';
   if (typeof auth !== 'string' || !B64URL.test(auth) || auth.length !== 22) return 'Neispravna pretplata.';
   if (!Array.isArray(b.teamIds) || b.teamIds.length > 60 || !b.teamIds.every((t) => typeof t === 'string' && UUID.test(t))) return 'Neispravan popis momčadi.';
+  if (b.clubIds != null && (!Array.isArray(b.clubIds) || b.clubIds.length > 100 || !b.clubIds.every((t) => typeof t === 'string' && UUID.test(t)))) return 'Neispravan popis klubova.';
   if (!Array.isArray(b.events) || !b.events.every((e) => (PUSH_EVENTS as readonly string[]).includes(e))) return 'Neispravan popis obavijesti.';
   return null;
 }

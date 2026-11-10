@@ -6,12 +6,12 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeAdvancement } from '../src/lib/advancement.js';
-import { authorize, MutationError, type Mutation, type TableName } from '../src/lib/mutations.js';
+import { authorize, MutationError, ORG_MUTATIONS, type CopyOptions, type Mutation, type NewTournament, type TableName } from '../src/lib/mutations.js';
 import type { Group, GroupTeam, Match, Role, Tournament } from '../src/lib/types.js';
 import { checkSubscribe, type MatchChange, type SubscribeBody } from './notify.js';
 
 export interface TokenData {
-  t: string; // tournament id
+  t: string; // tournament id; '*' za organizaciju (svi turniri)
   r: Role;
   f: string | null; // field id
   p: string; // id PIN-a
@@ -54,7 +54,9 @@ export function verifyToken(secret: string, token: string | null | undefined): T
 
 /** Vrijedi li još PIN kojim je osoba ušla (nije promijenjen ni obrisan). */
 async function pinStillValid(db: SupabaseClient, s: TokenData): Promise<boolean> {
-  const { data } = await db.from('pins').select('updated_at').eq('id', s.p).eq('tournament_id', s.t).maybeSingle();
+  const { data } = s.r === 'owner'
+    ? await db.from('org_pins').select('updated_at').eq('id', s.p).maybeSingle()
+    : await db.from('pins').select('updated_at').eq('id', s.p).eq('tournament_id', s.t).maybeSingle();
   return !!data && new Date((data as { updated_at: string }).updated_at).getTime() === new Date(s.v).getTime();
 }
 
@@ -62,23 +64,57 @@ const isUuid = (s: unknown): s is string =>
   typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
 // ---------------------------------------------------------------------
-// POST login { tournamentId, pin } → { tournamentId, role, fieldId, token }
+// POST login { tournamentId?, pin } → { tournamentId, slug, role, fieldId, token }
+// Bez turnira: prvo PIN organizacije, pa PIN-ovi turnira koji su u tijeku.
 // ---------------------------------------------------------------------
+
+interface PinRow { id: string; role: Role; field_id: string | null; updated_at: string }
+
+async function checkPin(db: SupabaseClient, tournamentId: string, pin: string): Promise<PinRow | null> {
+  const { data, error } = await db.rpc('check_pin', { p_tournament_id: tournamentId, p_pin: pin });
+  if (error) throw error;
+  return (data as PinRow[])[0] ?? null;
+}
 
 export async function login(db: SupabaseClient, secret: string, body: unknown): Promise<Reply> {
   const { tournamentId, pin } = (body ?? {}) as { tournamentId?: unknown; pin?: unknown };
-  if (!isUuid(tournamentId) || typeof pin !== 'string' || !/^[0-9]{4,8}$/.test(pin)) {
+  if (typeof pin !== 'string' || !/^[0-9]{4,8}$/.test(pin) || (tournamentId != null && !isUuid(tournamentId))) {
     return fail(401, 'PIN nije točan.');
   }
-  const { data, error } = await db.rpc('check_pin', { p_tournament_id: tournamentId, p_pin: pin });
-  if (error) {
-    console.error(error);
+  try {
+    if (isUuid(tournamentId)) {
+      const { data: t } = await db.from('tournaments').select('slug, closed_at').eq('id', tournamentId).maybeSingle();
+      const tour = t as { slug: string; closed_at: string | null } | null;
+      const match = tour ? await checkPin(db, tournamentId, pin) : null;
+      if (match) {
+        if (tour!.closed_at && match.role === 'field') return fail(403, 'Turnir je završen. PIN terena više ne vrijedi.');
+        const token = signToken(secret, { t: tournamentId, r: match.role, f: match.field_id, p: match.id, v: match.updated_at });
+        return { status: 200, body: { tournamentId, slug: tour!.slug, role: match.role, fieldId: match.field_id, token } };
+      }
+    }
+    // PIN organizacije vrijedi svugdje.
+    const { data: org, error } = await db.rpc('check_org_pin', { p_pin: pin });
+    if (error) throw error;
+    const o = (org as { id: string; updated_at: string }[])[0];
+    if (o) {
+      const token = signToken(secret, { t: '*', r: 'owner', f: null, p: o.id, v: o.updated_at });
+      return { status: 200, body: { tournamentId: isUuid(tournamentId) ? tournamentId : null, role: 'owner', fieldId: null, token } };
+    }
+    if (isUuid(tournamentId)) return fail(401, 'PIN nije točan.');
+    // Bez odabranog turnira: turniri koji nisu zaključeni.
+    const { data: open } = await db.from('tournaments').select('id, slug').is('closed_at', null).order('start_date', { ascending: false });
+    for (const t of (open ?? []) as { id: string; slug: string }[]) {
+      const match = await checkPin(db, t.id, pin);
+      if (match) {
+        const token = signToken(secret, { t: t.id, r: match.role, f: match.field_id, p: match.id, v: match.updated_at });
+        return { status: 200, body: { tournamentId: t.id, slug: t.slug, role: match.role, fieldId: match.field_id, token } };
+      }
+    }
+    return fail(401, 'PIN nije točan.');
+  } catch (e) {
+    console.error(e);
     return fail(500, 'Prijava trenutno ne radi. Pokušaj ponovno.');
   }
-  const match = (data as { id: string; role: Role; field_id: string | null; updated_at: string }[])[0];
-  if (!match) return fail(401, 'PIN nije točan.');
-  const token = signToken(secret, { t: tournamentId, r: match.role, f: match.field_id, p: match.id, v: match.updated_at });
-  return { status: 200, body: { tournamentId, role: match.role, fieldId: match.field_id, token } };
 }
 
 // ---------------------------------------------------------------------
@@ -88,20 +124,33 @@ export async function login(db: SupabaseClient, secret: string, body: unknown): 
 export async function mutate(db: SupabaseClient, secret: string, token: string | null, body: unknown): Promise<Reply> {
   const session = verifyToken(secret, token);
   if (!session) return fail(401, 'Prijava je istekla. Upiši PIN ponovno.');
-  const mutations = (body as { mutations?: Mutation[] } | null)?.mutations;
+  const { mutations, tournamentId } = (body ?? {}) as { mutations?: Mutation[]; tournamentId?: unknown };
   if (!Array.isArray(mutations) || mutations.length === 0 || mutations.length > 300) {
     return fail(400, 'Neispravan zahtjev.');
   }
   if (!(await pinStillValid(db, session))) return fail(401, 'PIN je promijenjen. Upiši novi PIN.');
 
+  // Organizacija radi u turniru koji je odabrala.
+  let s = session;
+  if (session.r === 'owner') {
+    const needsTournament = mutations.some((m) => !ORG_MUTATIONS.has(m?.type) && !(m?.type !== 'score' && 'table' in m && m.table === 'clubs'));
+    if (needsTournament) {
+      if (!isUuid(tournamentId)) return fail(400, 'Odaberi turnir.');
+      const { data } = await db.from('tournaments').select('id').eq('id', tournamentId).maybeSingle();
+      if (!data) return fail(404, 'Turnir ne postoji.');
+      s = { ...session, t: tournamentId };
+    }
+  }
+
   const categories = new Set<string>();
   const changes: MatchChange[] = [];
+  const out: Record<string, unknown> = {};
   try {
     for (const raw of mutations) {
-      for (const c of await apply(db, session, raw, changes)) categories.add(c);
+      for (const c of await apply(db, s, raw, changes, out)) categories.add(c);
     }
-    for (const c of categories) await advance(db, session.t, c);
-    return { status: 200, body: { ok: true }, changes };
+    for (const c of categories) await advance(db, s.t, c);
+    return { status: 200, body: { ok: true, ...out }, changes };
   } catch (e) {
     if (e instanceof MutationError) return fail(e.status, e.message);
     console.error(e);
@@ -121,7 +170,7 @@ const MAX_UPLOAD = 3 * 1024 * 1024;
 export async function upload(db: SupabaseClient, secret: string, token: string | null, body: unknown): Promise<Reply> {
   const s = verifyToken(secret, token);
   if (!s) return fail(401, 'Prijava je istekla. Upiši PIN ponovno.');
-  if (s.r !== 'admin') return fail(403, 'Za ovo treba glavni PIN.');
+  if (s.r !== 'admin' && s.r !== 'owner') return fail(403, 'Za ovo treba glavni PIN.');
   const { type, data } = (body ?? {}) as { type?: string; data?: string };
   const ext = type ? TYPES[type] : undefined;
   const base64 = typeof data === 'string' ? data.replace(/^data:[^;]+;base64,/, '') : '';
@@ -129,7 +178,7 @@ export async function upload(db: SupabaseClient, secret: string, token: string |
   const bytes = Buffer.from(base64, 'base64');
   if (bytes.length > MAX_UPLOAD) return fail(400, 'Slika je veća od 3 MB.');
   if (!(await pinStillValid(db, s))) return fail(401, 'PIN je promijenjen. Upiši novi PIN.');
-  const path = `${s.t}/${crypto.randomUUID()}.${ext}`;
+  const path = `${s.t === '*' ? 'klubovi' : s.t}/${crypto.randomUUID()}.${ext}`;
   const { error } = await db.storage.from('logos').upload(path, bytes, { contentType: type, upsert: false });
   if (error) {
     console.error(error);
@@ -148,10 +197,11 @@ export async function subscribe(db: SupabaseClient, body: unknown): Promise<Repl
   const b = body as SubscribeBody;
   const { error } = await db.from('push_subscriptions').upsert({
     endpoint: b.subscription.endpoint,
-    tournament_id: b.tournamentId,
+    tournament_id: b.tournamentId ?? null,
     p256dh: b.subscription.keys.p256dh,
     auth: b.subscription.keys.auth,
     team_ids: b.teamIds,
+    club_ids: b.clubIds ?? [],
     events: b.events,
   }, { onConflict: 'endpoint' });
   if (error) {
@@ -175,7 +225,7 @@ export async function unsubscribe(db: SupabaseClient, body: unknown): Promise<Re
 const KEY: Partial<Record<TableName, string>> = { group_teams: 'team_id' };
 
 /** Primijeni jednu izmjenu; vrati kategorije kojima treba preračunati nastavak. */
-async function apply(db: SupabaseClient, s: TokenData, raw: Mutation, changes: MatchChange[]): Promise<string[]> {
+async function apply(db: SupabaseClient, s: TokenData, raw: Mutation, changes: MatchChange[], out: Record<string, unknown>): Promise<string[]> {
   const actor = { role: s.r, fieldId: s.f };
 
   if (raw.type === 'score') {
@@ -191,6 +241,37 @@ async function apply(db: SupabaseClient, s: TokenData, raw: Mutation, changes: M
   }
 
   const m = authorize(raw, actor);
+
+  if (m.type === 'createTournament') {
+    out.created = await createTournament(db, m.row, m.copyFrom ?? null, m.copy ?? {});
+    return [];
+  }
+
+  if (m.type === 'setOrgPin') {
+    const { error } = await db.rpc('set_org_pin', { p_label: m.label, p_pin: m.pin });
+    if (error) throw new MutationError(error.message.includes('već koristi') ? 'Taj PIN već koristi netko drugi.' : 'PIN nije spremljen.');
+    return [];
+  }
+
+  if (m.type === 'closeTournament') {
+    const { error } = await db.from('tournaments').update({ closed_at: m.reopen ? null : new Date().toISOString() }).eq('id', s.t);
+    if (error) throw error;
+    // Zaključan turnir: PIN-ovi terena prestaju vrijediti.
+    if (!m.reopen) await db.from('pins').delete().eq('tournament_id', s.t).eq('role', 'field');
+    return [];
+  }
+
+  if ((m.type === 'upsert' || m.type === 'delete') && m.table === 'clubs') {
+    if (m.type === 'delete') {
+      const { error } = await db.from('clubs').delete().eq('id', m.id);
+      if (error) throw error;
+      return [];
+    }
+    if (typeof m.row.name !== 'string' || !m.row.name.trim()) throw new MutationError('Upiši naziv kluba.');
+    const { error } = await db.from('clubs').upsert({ ...m.row, name: m.row.name.trim() }, { onConflict: 'id' });
+    if (error) throw error;
+    return [];
+  }
 
   if (m.type === 'setPin') {
     if (m.fieldId) await ensureOwn(db, 'fields', 'id', m.fieldId, s.t);
@@ -237,6 +318,72 @@ async function apply(db: SupabaseClient, s: TokenData, raw: Mutation, changes: M
     return data ? [(data as { category_id: string }).category_id] : [];
   }
   return [];
+}
+
+/** Novi turnir; po želji s godištima, terenima i momčadima iz prethodnog. */
+async function createTournament(db: SupabaseClient, row: NewTournament, copyFrom: string | null, copy: CopyOptions): Promise<{ id: string; slug: string }> {
+  const { data: taken } = await db.from('tournaments').select('id').eq('slug', row.slug).maybeSingle();
+  if (taken) throw new MutationError('Turnir s tom adresom već postoji.', 409);
+
+  let base: Partial<Tournament> = {};
+  if (copyFrom) {
+    if (!isUuid(copyFrom)) throw new MutationError('Nepoznat turnir za kopiranje.');
+    const { data } = await db.from('tournaments').select('*').eq('id', copyFrom).maybeSingle();
+    if (!data) throw new MutationError('Nepoznat turnir za kopiranje.');
+    base = data as Tournament;
+  }
+  const { data: created, error } = await db.from('tournaments').insert({
+    ...row,
+    timezone: base.timezone ?? 'Europe/Zagreb',
+    logo_path: base.logo_path ?? null,
+    color_primary: base.color_primary ?? '#019c61',
+    color_secondary: base.color_secondary ?? '#061a10',
+    description: base.description ?? null,
+    rules: base.rules ?? null,
+    points_win: base.points_win ?? 3,
+    points_draw: base.points_draw ?? 1,
+    points_loss: base.points_loss ?? 0,
+    tiebreakers: base.tiebreakers ?? ['head_to_head', 'goal_difference', 'goals_for', 'fewer_goals_against', 'fewer_cards', 'lot'],
+    scorers_enabled: base.scorers_enabled ?? false,
+    is_published: false,
+  }).select('id, slug').single();
+  if (error) throw error;
+  const t = created as { id: string; slug: string };
+  if (!copyFrom) return t;
+
+  const catMap = new Map<string, string>();
+  if (copy.categories || copy.teams) {
+    const { data: cats } = await db.from('categories').select('*').eq('tournament_id', copyFrom);
+    const rows = ((cats ?? []) as { id: string; name: string; birth_year: number | null; match_minutes: number; players_on_field: number | null; sort_order: number }[])
+      .map((c) => {
+        const id = crypto.randomUUID();
+        catMap.set(c.id, id);
+        return { id, tournament_id: t.id, name: c.name, birth_year: c.birth_year, match_minutes: c.match_minutes, players_on_field: c.players_on_field, sort_order: c.sort_order };
+      });
+    if (rows.length) {
+      const { error: e } = await db.from('categories').insert(rows);
+      if (e) throw e;
+    }
+  }
+  if (copy.fields) {
+    const { data: fields } = await db.from('fields').select('name, venue, maps_url, sort_order').eq('tournament_id', copyFrom);
+    const rows = ((fields ?? []) as Record<string, unknown>[]).map((f) => ({ ...f, tournament_id: t.id }));
+    if (rows.length) {
+      const { error: e } = await db.from('fields').insert(rows);
+      if (e) throw e;
+    }
+  }
+  if (copy.teams) {
+    const { data: teams } = await db.from('teams').select('category_id, name, short_name, logo_path, club_id').eq('tournament_id', copyFrom);
+    const rows = ((teams ?? []) as { category_id: string }[])
+      .filter((x) => catMap.has(x.category_id))
+      .map((x) => ({ ...x, category_id: catMap.get(x.category_id), tournament_id: t.id }));
+    if (rows.length) {
+      const { error: e } = await db.from('teams').insert(rows);
+      if (e) throw e;
+    }
+  }
+  return t;
 }
 
 async function ensureOwn(db: SupabaseClient, table: string, key: string, id: string, tournamentId: string) {

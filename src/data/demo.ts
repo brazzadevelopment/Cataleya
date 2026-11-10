@@ -1,12 +1,13 @@
 // Demo način: podaci u localStorage, bez Supabasea.
-// PIN-ovi: glavni 9000, tereni redom 1001, 1002, … (vidi seed.ts).
+// PIN-ovi: organizacija 9999, glavni 9000, tereni redom 1001, 1002, … (vidi seed.ts).
 
 import { applyToSnapshot, authorize, MutationError, type Mutation } from '../lib/mutations';
 import type { Session, Snapshot } from '../lib/types';
 import { DEMO_PINS, demoSnapshot } from './seed';
 import type { DataSource } from './source';
 
-const KEY = 'turnir.demo.v2';
+const KEY = 'turnir.demo.v3';
+export const DEMO_ORG_PIN = '9999';
 const PINS_KEY = 'turnir.demo.pins.v2';
 
 interface Pins {
@@ -56,6 +57,22 @@ export function createDemoSource(): DataSource {
     async listTournaments() {
       return [snap.tournament];
     },
+    async listClubs() {
+      return [...snap.clubs].sort((a, b) => a.name.localeCompare(b.name, 'hr'));
+    },
+    async clubHistory(clubId) {
+      const teams = snap.teams.filter((t) => t.club_id === clubId);
+      const ids = new Set(teams.map((t) => t.id));
+      const matches = snap.matches.filter((m) => ids.has(m.home_team_id ?? '') || ids.has(m.away_team_id ?? ''));
+      return { club: snap.clubs.find((c) => c.id === clubId) ?? null, teams: snap.teams, matches, tournaments: [snap.tournament], categories: snap.categories };
+    },
+    async hallOfFame() {
+      const matches = snap.matches.filter((m) => m.status === 'finished' && (m.winner_place != null || m.loser_place != null));
+      return { matches, teams: snap.teams, tournaments: [snap.tournament], categories: snap.categories };
+    },
+    async liveCounts() {
+      return { [snap.tournament.id]: snap.matches.filter((m) => m.status === 'live').length };
+    },
     async load(slug) {
       return slug === snap.tournament.slug ? structuredClone(snap) : null;
     },
@@ -63,10 +80,13 @@ export function createDemoSource(): DataSource {
       listeners.add(onChange);
       return () => listeners.delete(onChange);
     },
-    async login(tournamentId, pin) {
-      if (pin === pins.admin) return { tournamentId, role: 'admin', fieldId: null, token: 'demo' };
+    async login(_tournamentId, pin) {
+      const tournamentId = snap.tournament.id;
+      const slug = snap.tournament.slug;
+      if (pin === DEMO_ORG_PIN) return { tournamentId: '', role: 'owner', fieldId: null, token: 'demo' };
+      if (pin === pins.admin) return { tournamentId, slug, role: 'admin', fieldId: null, token: 'demo' };
       const field = Object.entries(pins.fields).find(([, p]) => p === pin);
-      if (field) return { tournamentId, role: 'field', fieldId: field[0], token: 'demo' };
+      if (field && !snap.tournament.closed_at) return { tournamentId, slug, role: 'field', fieldId: field[0], token: 'demo' };
       return null;
     },
     async mutate(session: Session, mutations: Mutation[]) {
@@ -83,10 +103,12 @@ export function createDemoSource(): DataSource {
           write(PINS_KEY, pins);
           continue;
         }
+        if (m.type === 'setOrgPin') continue;
         next = applyToSnapshot(next, m);
       }
       snap = next;
       save();
+      return {};
     },
     async uploadImage(_session, file) {
       return new Promise((resolve, reject) => {

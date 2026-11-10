@@ -2,7 +2,8 @@
 // Koristi ih demo način, a scripts/seed-sql.ts iz njih radi SQL za Supabase.
 
 import { zonedToIso } from '../lib/time';
-import type { Category, Field, Group, GroupTeam, Match, Snapshot, Team, Tournament } from '../lib/types';
+import { clubNameOf, slugify } from '../lib/mutations';
+import type { Category, Club, Field, Group, GroupTeam, Match, Snapshot, Team, Tournament } from '../lib/types';
 import { CATALEYA, type Day, type RawCategory } from './cataleya';
 
 const TZ = 'Europe/Zagreb';
@@ -220,7 +221,16 @@ function build(): Snapshot {
     }));
   });
 
-  return { tournament, categories, fields: [...fields.values()], teams, groups, groupTeams, matches };
+  // Klubovi: momčadi istog kluba (npr. plavi i bijeli) dijele klub.
+  const clubs = new Map<string, Club>();
+  for (const t of teams) {
+    const name = clubNameOf(t.name);
+    const id = `club-${slugify(name)}`;
+    if (!clubs.has(id)) clubs.set(id, { id, name, short_name: null, city: null, logo_path: null });
+    t.club_id = id;
+  }
+
+  return { tournament, categories, fields: [...fields.values()], teams, groups, groupTeams, matches, clubs: [...clubs.values()] };
 }
 
 const SNAPSHOT = build();

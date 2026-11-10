@@ -1,11 +1,8 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { Admin } from './admin/Admin';
+import { HubLayout } from './components/HubLayout';
 import { Layout } from './components/Layout';
-import { Splash, TournamentProvider } from './data/TournamentContext';
-import { source } from './data/source';
-import type { Tournament } from './lib/types';
-import { dateSpan } from './lib/time';
+import { TournamentProvider } from './data/TournamentContext';
 import { Bracket, FinalStandings } from './pages/Bracket';
 import { HelpParents, HelpScorekeeper } from './pages/Help';
 import { Home } from './pages/Home';
@@ -19,12 +16,24 @@ import { Schedule } from './pages/Schedule';
 import { ScoreEntry, ScorerList } from './pages/Scorer';
 import { Tables } from './pages/Tables';
 import { TeamPage } from './pages/TeamPage';
+import { ClubPage, Clubs } from './pages/hub/Clubs';
+import { HubHome } from './pages/hub/HubHome';
+import { GlobalLogin, Organizacija } from './pages/hub/Organizacija';
+import { Privacy } from './pages/hub/Privacy';
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<TournamentList />} />
+        <Route element={<HubLayout />}>
+          <Route path="/" element={<HubHome />} />
+          <Route path="/klubovi" element={<Clubs />} />
+          <Route path="/klub/:id" element={<ClubPage />} />
+          <Route path="/prijava" element={<GlobalLogin />} />
+          <Route path="/organizacija" element={<Organizacija />} />
+          <Route path="/obavijesti" element={<NotifyGuide />} />
+          <Route path="/privatnost" element={<Privacy />} />
+        </Route>
         <Route path="/t/:slug/*" element={<TournamentRoutes />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -59,32 +68,5 @@ function TournamentRoutes() {
         </Route>
       </Routes>
     </TournamentProvider>
-  );
-}
-
-/** Popis turnira; ako postoji samo jedan, odmah ga otvara. */
-function TournamentList() {
-  const [list, setList] = useState<Tournament[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    source.listTournaments().then(setList).catch((e) => setError(e instanceof Error ? e.message : String(e)));
-  }, []);
-  if (error) return <Splash text={error} />;
-  if (!list) return <Splash text="Učitavam…" />;
-  if (list.length === 1) return <Navigate to={`/t/${list[0].slug}`} replace />;
-  return (
-    <div className="mx-auto max-w-xl px-4 pb-10 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
-      <img src="/logo.svg" alt="" className="mx-auto size-16" />
-      <h1 className="heading mt-4 text-center text-2xl">Turniri</h1>
-      <div className="mt-6 space-y-3">
-        {list.map((t) => (
-          <Link key={t.id} to={`/t/${t.slug}`} className="card block p-4">
-            <div className="heading text-lg">{t.name}</div>
-            <div className="mt-1 text-[13px] text-white/60">{dateSpan(t.start_date, t.end_date)} · {t.place}</div>
-          </Link>
-        ))}
-        {!list.length && <p className="text-center text-white/60">Još nema objavljenih turnira.</p>}
-      </div>
-    </div>
   );
 }

@@ -26,7 +26,7 @@ export function Admin() {
   const base = `/t/${snap.tournament.slug}`;
   const [tab, setTab] = useState<Tab>(() => (sessionStorage.getItem('turnir.admin.tab') as Tab) || 'rezultati');
   if (!session) return <Navigate to={`${base}/prijava`} replace />;
-  if (session.role !== 'admin') return <Navigate to={`${base}/zapisnik`} replace />;
+  if (session.role === 'field') return <Navigate to={`${base}/zapisnik`} replace />;
 
   const choose = (t: Tab) => {
     setTab(t);
@@ -37,7 +37,8 @@ export function Admin() {
     <div>
       <div className="flex items-center gap-2">
         <h1 className="heading text-lg">Uređivanje</h1>
-        <Link to={base} className="ml-auto text-[12px] font-bold text-white/55">Pogled gledatelja</Link>
+        {session.role === 'owner' && <Link to="/organizacija" className="ml-auto text-[12px] font-bold text-brand-soft">Organizacija</Link>}
+        <Link to={base} className={`${session.role === 'owner' ? '' : 'ml-auto '}text-[12px] font-bold text-white/55`}>Pogled gledatelja</Link>
         <button type="button" onClick={() => setSession(null)} className="inline-flex h-9 items-center gap-1 pl-2 text-[12px] font-bold text-white/55">
           <Icon name="logout" className="size-4" /> Odjava
         </button>

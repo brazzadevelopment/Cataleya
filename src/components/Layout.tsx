@@ -18,6 +18,9 @@ export function Layout() {
       )}
       <header className="sticky top-0 z-20 border-b border-line bg-pitch-950/85 px-4 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
         <div className="flex items-center gap-3">
+          <NavLink to="/" aria-label="Svi turniri Cataleya Cupa" className="-ml-2 -mr-1 grid size-8 shrink-0 place-items-center rounded-full text-white/60">
+            <Icon name="back" className="size-5" />
+          </NavLink>
           <NavLink to={base} className="flex min-w-0 items-center gap-3">
             <Emblem className="size-11 drop-shadow-[0_0_12px_rgb(1_156_97_/_0.5)]" />
             <div className="min-w-0 leading-none">
@@ -29,11 +32,11 @@ export function Layout() {
           </NavLink>
           {session ? (
             <NavLink
-              to={session.role === 'admin' ? `${base}/admin` : `${base}/zapisnik`}
-              aria-label={session.role === 'admin' ? 'Uređivanje' : 'Zapisnik'}
+              to={session.role !== 'field' ? `${base}/admin` : `${base}/zapisnik`}
+              aria-label={session.role !== 'field' ? 'Uređivanje' : 'Zapisnik'}
               className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-brand/15 text-brand-soft ring-1 ring-brand/40"
             >
-              <Icon name={session.role === 'admin' ? 'edit' : 'whistle'} className="size-5" />
+              <Icon name={session.role !== 'field' ? 'edit' : 'whistle'} className="size-5" />
             </NavLink>
           ) : (
             <NavLink

@@ -18,7 +18,7 @@ export function MatchPage() {
   const field = snap.fields.find((f) => f.id === m.field_id);
   const day = matchDay(snap, m);
   const o = matchOutcome(m);
-  const canEdit = session && (session.role === 'admin' || session.fieldId === m.field_id);
+  const canEdit = session && (session.role !== 'field' || session.fieldId === m.field_id);
   const statusText = { scheduled: 'Zakazano', live: '', finished: 'Kraj', cancelled: 'Otkazano' }[m.status];
 
   return (

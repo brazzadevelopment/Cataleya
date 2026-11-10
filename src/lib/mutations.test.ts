@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyToSnapshot, authorize, MutationError, type ScorePatch } from './mutations';
+import { clubNameOf, slugify } from './mutations';
 import { demoSnapshot } from '../data/seed';
 
 const patch: ScorePatch = { home_score: 1, away_score: 0, home_penalties: null, away_penalties: null, status: 'live' };
@@ -58,5 +59,45 @@ describe('primjena izmjena u demo načinu', () => {
     expect(s.teams.some((t) => t.id === 'tm-u2019-nk-zagreb')).toBe(false);
     expect(s.groupTeams.some((g) => g.team_id === 'tm-u2019-nk-zagreb')).toBe(false);
     expect(s.matches.some((m) => m.home_team_id === 'tm-u2019-nk-zagreb' || m.away_team_id === 'tm-u2019-nk-zagreb')).toBe(false);
+  });
+});
+
+describe('organizacija, novi turnir i klubovi', () => {
+  const owner = { role: 'owner' as const, fieldId: null };
+  const admin = { role: 'admin' as const, fieldId: null };
+  const field = { role: 'field' as const, fieldId: 'f1' };
+  const nt = { type: 'createTournament' as const, row: { name: 'Cataleya Cup Zima 2027', slug: 'cataleya-cup-zima-2027', start_date: '2027-01-15', end_date: '2027-01-17' } };
+
+  it('novi turnir i PIN organizacije smije samo organizacija', () => {
+    expect(() => authorize(nt, owner)).not.toThrow();
+    expect(() => authorize(nt, admin)).toThrow(/organizacije/);
+    expect(() => authorize(nt, field)).toThrow();
+    expect(() => authorize({ type: 'setOrgPin', label: 'Vedran', pin: '4321' }, owner)).not.toThrow();
+    expect(() => authorize({ type: 'setOrgPin', label: 'Vedran', pin: '4321' }, admin)).toThrow();
+  });
+
+  it('provjerava naziv, adresu i datume novog turnira', () => {
+    expect(() => authorize({ ...nt, row: { ...nt.row, slug: 'Zima 2027' } }, owner)).toThrow(/mala slova/);
+    expect(() => authorize({ ...nt, row: { ...nt.row, end_date: '2027-01-14' } }, owner)).toThrow(/prije/);
+    expect(() => authorize({ ...nt, row: { ...nt.row, name: 'X' } }, owner)).toThrow(/naziv/);
+  });
+
+  it('zaključavanje turnira: glavni PIN da, teren ne', () => {
+    expect(() => authorize({ type: 'closeTournament' }, admin)).not.toThrow();
+    expect(() => authorize({ type: 'closeTournament' }, field)).toThrow();
+  });
+
+  it('klub uređuje organizator turnira, briše samo organizacija', () => {
+    const up = { type: 'upsert' as const, table: 'clubs' as const, row: { id: 'c1', name: 'NŠK Nova Zora', city: 'Zadar', hack: 1 } };
+    expect(authorize(up, admin)).toEqual({ ...up, row: { id: 'c1', name: 'NŠK Nova Zora', city: 'Zadar' } });
+    expect(() => authorize({ type: 'delete', table: 'clubs', id: 'c1' }, admin)).toThrow(/organizacija/);
+    expect(() => authorize({ type: 'delete', table: 'clubs', id: 'c1' }, owner)).not.toThrow();
+  });
+
+  it('naziv kluba i adresa turnira', () => {
+    expect(clubNameOf('NK Lokomotiva plavi')).toBe('NK Lokomotiva');
+    expect(clubNameOf('NK Karlovac plavi 1919')).toBe('NK Karlovac 1919');
+    expect(clubNameOf('NŠK Nova Zora')).toBe('NŠK Nova Zora');
+    expect(slugify('Cataleya Cup · Zima 2027 (Višnjik)')).toBe('cataleya-cup-zima-2027-visnjik');
   });
 });

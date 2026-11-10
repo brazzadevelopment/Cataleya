@@ -53,7 +53,7 @@ export function StarButton({ teamId, className = '' }: { teamId: string; classNa
         toggleFavorite(teamId);
       }}
       aria-pressed={on}
-      aria-label={on ? 'Makni iz mojih momčadi' : 'Dodaj u moje momčadi'}
+      aria-label={on ? 'Prestani pratiti klub' : 'Prati klub'}
       className={`grid size-9 shrink-0 place-items-center rounded-full transition active:scale-90 ${on ? 'text-gold' : 'text-white/35 hover:text-white/70'} ${className}`}
     >
       <Icon name={on ? 'star-fill' : 'star'} className="size-5" />

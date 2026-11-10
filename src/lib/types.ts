@@ -41,6 +41,17 @@ export interface Tournament {
   tiebreakers: Tiebreaker[];
   scorers_enabled: boolean;
   is_published: boolean;
+  /** Turnir je zaključen: PIN-ovi terena više ne vrijede, ide u arhivu. */
+  closed_at?: string | null;
+}
+
+/** Klub kroz sve turnire; momčad pripada klubu. */
+export interface Club {
+  id: string;
+  name: string;
+  short_name: string | null;
+  city: string | null;
+  logo_path: string | null;
 }
 
 export interface Category {
@@ -69,6 +80,7 @@ export interface Team {
   name: string;
   short_name: string | null;
   logo_path: string | null;
+  club_id?: string | null;
 }
 
 export interface Group {
@@ -128,11 +140,15 @@ export interface Snapshot {
   groups: Group[];
   groupTeams: GroupTeam[];
   matches: Match[];
+  /** Klubovi momčadi ovog turnira. */
+  clubs: Club[];
 }
 
-export type Role = 'admin' | 'field';
+/** owner = organizacija: svi turniri, novi turnir, klubovi. */
+export type Role = 'admin' | 'field' | 'owner';
 
 export interface Session {
+  /** Prazno za organizaciju dok ne odabere turnir. */
   tournamentId: string;
   role: Role;
   fieldId: string | null;

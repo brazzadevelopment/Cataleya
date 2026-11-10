@@ -5,7 +5,7 @@
 @import '@fontsource/montserrat/800.css';
 @import '@fontsource/montserrat/900.css';
 
-/* Boje Cataleya Cupa: cijela aplikacija svijetlozelena (#459967), logo je cvijet
+/* Boje Cataleya Cupa: cijela aplikacija svijetlozelena (#459967), naslovi žuti, logo je cvijet
    u duginim bojama. Žuta samo za zvjezdice i pehare. */
 @theme {
   --font-sans: 'Montserrat', system-ui, sans-serif;
@@ -21,7 +21,7 @@
 
   --color-brand: #2f7a4d;
   --color-brand-deep: #286a42;
-  --color-brand-soft: #e2f7ea;
+  --color-brand-soft: #ffd84a;
   --color-gold: #f2c230;
   --color-gold-soft: #f7d873;
   --color-bloom-pink: #ff4fa3;
@@ -60,6 +60,16 @@
 
 @utility card {
   @apply rounded-2xl border border-line bg-pitch-850 shadow-[0_6px_18px_-12px_rgb(0_40_20_/_0.35)];
+}
+
+/* Veliki naslovi žuti kao na plakatu turnira, s laganom sjenom da se čitaju na zelenoj. */
+@layer base {
+  main h1.heading,
+  main .heading.text-\[26px\],
+  main .heading.text-\[28px\] {
+    color: var(--color-brand-soft);
+    text-shadow: 0 1px 2px rgb(0 40 20 / 0.35);
+  }
 }
 
 @utility heading {

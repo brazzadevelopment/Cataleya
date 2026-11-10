@@ -1,0 +1,4 @@
+[{"id":"bb9b707e-1540-eb12-360b-fcf91820eaf9","tournament_id":"22932050-a898-99b2-bccb-6a14c141e40f","name":"2016.","birth_year":2016,"match_minutes":30,"players_on_field":8,"sort_order":0,"created_at":"2026-10-23T20:36:33.282725+00:00"}, 
+ {"id":"a1ab6324-8643-354f-11dc-9f09b691d0ee","tournament_id":"22932050-a898-99b2-bccb-6a14c141e40f","name":"2017.","birth_year":2017,"match_minutes":30,"players_on_field":8,"sort_order":1,"created_at":"2026-10-23T20:36:33.282725+00:00"}, 
+ {"id":"7a0c0df3-de8b-dbce-1263-69c924de3f95","tournament_id":"22932050-a898-99b2-bccb-6a14c141e40f","name":"2018.","birth_year":2018,"match_minutes":25,"players_on_field":7,"sort_order":2,"created_at":"2026-10-23T20:36:33.282725+00:00"}, 
+ {"id":"21448f28-2071-1f69-6ec9-955f017d5d1f","tournament_id":"22932050-a898-99b2-bccb-6a14c141e40f","name":"2019.","birth_year":2019,"match_minutes":25,"players_on_field":7,"sort_order":3,"created_at":"2026-10-23T20:36:33.282725+00:00"}]

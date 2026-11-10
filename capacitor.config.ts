@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   appId: 'hr.cataleyacup.app',
   appName: 'Cataleya Cup',
   webDir: 'dist',
-  backgroundColor: '#439664',
+  backgroundColor: '#459967',
   android: { allowMixedContent: false },
   ios: { contentInset: 'never' },
   plugins: {

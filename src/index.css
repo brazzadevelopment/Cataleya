@@ -5,17 +5,17 @@
 @import '@fontsource/montserrat/800.css';
 @import '@fontsource/montserrat/900.css';
 
-/* Boje Cataleya Cupa: cijela aplikacija svijetlozelena (#439664), logo je cvijet
+/* Boje Cataleya Cupa: cijela aplikacija svijetlozelena (#459967), logo je cvijet
    u duginim bojama. Žuta samo za zvjezdice i pehare. */
 @theme {
   --font-sans: 'Montserrat', system-ui, sans-serif;
 
-  --color-pitch-950: #439664;
-  --color-pitch-900: #3e8d5e;
-  --color-pitch-850: #3b8758;
-  --color-pitch-800: #367e52;
-  --color-pitch-700: #31734b;
-  --color-pitch-600: #2c6a45;
+  --color-pitch-950: #459967;
+  --color-pitch-900: #459967;
+  --color-pitch-850: #4fa170;
+  --color-pitch-800: #56a777;
+  --color-pitch-700: #5dad7d;
+  --color-pitch-600: #66b385;
   --color-ink: #10301d;
   --color-line: rgb(255 255 255 / 0.18);
 
@@ -37,10 +37,6 @@
   }
   body {
     @apply bg-pitch-950 font-sans text-white antialiased;
-    background-image:
-      radial-gradient(120% 60% at 50% -10%, rgb(150 215 175 / 0.45), transparent 60%),
-      repeating-linear-gradient(115deg, rgb(255 255 255 / 0.03) 0 14px, transparent 14px 28px);
-    background-attachment: fixed;
     min-height: 100dvh;
   }
   button, a, input, select, textarea {
@@ -63,7 +59,7 @@
 }
 
 @utility card {
-  @apply rounded-2xl border border-line bg-pitch-850/90 shadow-[0_8px_24px_-14px_rgb(0_40_20_/_0.45)];
+  @apply rounded-2xl border border-line bg-pitch-850 shadow-[0_6px_18px_-12px_rgb(0_40_20_/_0.35)];
 }
 
 @utility heading {

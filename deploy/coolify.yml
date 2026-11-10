@@ -1,0 +1,344 @@
+# Cataleya Cup na serveru klubapp.hr (Coolify servis „cataleya”).
+# Baza = „stan” iz KlubApp predloška (node server/stan.mjs cataleya --site https://cataleya.klubapp.hr),
+# plus dva dijela Cataleye: api (PIN-ovi, izmjene, obavijesti; isto što je bila Supabase Edge Function)
+# i web (aplikacija). Kod se uzima s GitHuba (javni repozitorij), na verziji iz CATALEYA_REF.
+# Ključevi su Coolifyjeve magične varijable (SERVICE_*): generiraju se nasumično, nikad u repozitoriju.
+services:
+  db:
+    image: supabase/postgres:17.11.0.016
+    restart: unless-stopped
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - log_min_messages=fatal
+      # mali stan: puno klubova dijeli isti server
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - max_connections=60
+    environment:
+      - POSTGRES_HOST=/var/run/postgresql
+      - PGPORT=5432
+      - POSTGRES_PORT=5432
+      - PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - PGDATABASE=postgres
+      - POSTGRES_DB=postgres
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - JWT_EXP=3600
+    volumes:
+      - baza-podaci:/var/lib/postgresql/data
+      - baza-postavke:/etc/postgresql-custom
+      - type: bind
+        source: ./init/realtime.sql
+        target: /docker-entrypoint-initdb.d/migrations/99-realtime.sql
+        content: |
+          \set pguser `echo "$POSTGRES_USER"`
+          create schema if not exists _realtime;
+          alter schema _realtime owner to :pguser;
+      - type: bind
+        source: ./init/roles.sql
+        target: /docker-entrypoint-initdb.d/init-scripts/99-roles.sql
+        content: |
+          \set pgpass `echo "$POSTGRES_PASSWORD"`
+          ALTER USER authenticator WITH PASSWORD :'pgpass';
+          ALTER USER pgbouncer WITH PASSWORD :'pgpass';
+          ALTER USER supabase_auth_admin WITH PASSWORD :'pgpass';
+          ALTER USER supabase_storage_admin WITH PASSWORD :'pgpass';
+      - type: bind
+        source: ./init/jwt.sql
+        target: /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql
+        content: |
+          \set jwt_secret `echo "$JWT_SECRET"`
+          \set jwt_exp `echo "$JWT_EXP"`
+          ALTER DATABASE postgres SET "app.settings.jwt_secret" TO :'jwt_secret';
+          ALTER DATABASE postgres SET "app.settings.jwt_exp" TO :'jwt_exp';
+      - type: bind
+        source: ./init/sustav.sql
+        target: /docker-entrypoint-initdb.d/migrations/99-zz-sustav.sql
+        content: |
+          -- Održavanje stana preko HTTPS-a (shema, selidba, nadogradnje): POST /rest/v1/rpc/sustav_sql { "q": "..." }
+          -- SAMO s tajnim (service_role) ključem ovog stana – anon i prijavljeni članovi je ne mogu pozvati.
+          create or replace function public.sustav_sql(q text) returns jsonb
+          language plpgsql security definer set search_path = public, extensions as $fn$
+          declare r jsonb;
+          begin
+            if coalesce(current_setting('request.jwt.claims', true)::jsonb ->> 'role', '') <> 'service_role' then
+              raise exception 'Samo za održavanje (tajni ključ)';
+            end if;
+            begin
+              execute format('select coalesce(jsonb_agg(t), ''[]''::jsonb) from (%s) t', q) into r;
+            exception when syntax_error or feature_not_supported or wrong_object_type then
+              execute q;
+              r := jsonb_build_object('ok', true);
+            end;
+            return r;
+          end $fn$;
+          revoke all on function public.sustav_sql(text) from public, anon, authenticated;
+          grant execute on function public.sustav_sql(text) to service_role;
+
+  auth:
+    image: supabase/gotrue:v2.197.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:9999/health"]
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    environment:
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - API_EXTERNAL_URL=https://baza-cataleya.klubapp.hr/auth/v1
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@db:5432/postgres
+      - GOTRUE_SITE_URL=${SITE_URL:-https://cataleya.klubapp.hr}
+      - GOTRUE_URI_ALLOW_LIST=${REDIRECT_URLS:-https://cataleya.klubapp.hr/**}
+      - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
+      - GOTRUE_JWT_ADMIN_ROLES=service_role
+      - GOTRUE_JWT_AUD=authenticated
+      - GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
+      - GOTRUE_JWT_EXP=3600
+      - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - GOTRUE_EXTERNAL_EMAIL_ENABLED=true
+      - GOTRUE_EXTERNAL_PHONE_ENABLED=false
+      - GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED=false
+      # potvrda emaila isključena u svakom klubu (CLAUDE.md)
+      - GOTRUE_MAILER_AUTOCONFIRM=true
+      - GOTRUE_SMTP_ADMIN_EMAIL=${SMTP_USER:-}
+      - GOTRUE_SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - GOTRUE_SMTP_PORT=${SMTP_PORT:-465}
+      - GOTRUE_SMTP_USER=${SMTP_USER:-}
+      - GOTRUE_SMTP_PASS=${SMTP_PASS:-}
+      - GOTRUE_SMTP_SENDER_NAME=${SMTP_SENDER_NAME:-}
+      - GOTRUE_SMTP_MAX_FREQUENCY=1s
+      - GOTRUE_RATE_LIMIT_EMAIL_SENT=150
+      - GOTRUE_MAILER_URLPATHS_INVITE=/auth/v1/verify
+      - GOTRUE_MAILER_URLPATHS_CONFIRMATION=/auth/v1/verify
+      - GOTRUE_MAILER_URLPATHS_RECOVERY=/auth/v1/verify
+      - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/auth/v1/verify
+      # emailovi na hrvatskom, bez imena drugog kluba (supabase/email-*.html, objavljeni s aplikacijom kluba)
+      - GOTRUE_MAILER_TEMPLATES_RECOVERY=${MAILER_TEMPLATES_RECOVERY:-}
+      - GOTRUE_MAILER_SUBJECTS_RECOVERY=Nova lozinka za aplikaciju kluba
+      - GOTRUE_MAILER_SUBJECTS_MAGIC_LINK=Prijava u aplikaciju kluba
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.stan-cataleya-auth.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/auth/v1`)'
+      - 'traefik.http.routers.stan-cataleya-auth.entrypoints=https'
+      - 'traefik.http.routers.stan-cataleya-auth.tls=true'
+      - 'traefik.http.routers.stan-cataleya-auth.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.stan-cataleya-auth.service=stan-cataleya-auth'
+      - 'traefik.http.routers.stan-cataleya-auth.middlewares=stan-cataleya-auth-path,stan-cataleya-cors'
+      - 'traefik.http.middlewares.stan-cataleya-auth-path.stripprefix.prefixes=/auth/v1'
+      - 'traefik.http.services.stan-cataleya-auth.loadbalancer.server.port=9999'
+      - 'traefik.http.routers.stan-cataleya-auth-http.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/auth/v1`)'
+      - 'traefik.http.routers.stan-cataleya-auth-http.entrypoints=http'
+      - 'traefik.http.routers.stan-cataleya-auth-http.middlewares=stan-cataleya-https'
+      - 'traefik.http.middlewares.stan-cataleya-https.redirectscheme.scheme=https'
+      - 'traefik.http.middlewares.stan-cataleya-cors.headers.accesscontrolalloworiginlist=*'
+      - 'traefik.http.middlewares.stan-cataleya-cors.headers.accesscontrolallowmethods=GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD'
+      - 'traefik.http.middlewares.stan-cataleya-cors.headers.accesscontrolallowheaders=authorization,apikey,content-type,x-client-info,x-supabase-api-version,prefer,range,accept-profile,content-profile,x-upsert,cache-control,x-actor,tus-resumable,upload-length,upload-metadata,upload-offset'
+      - 'traefik.http.middlewares.stan-cataleya-cors.headers.accesscontrolexposeheaders=content-range,content-length,etag,x-total-count,location'
+      - 'traefik.http.middlewares.stan-cataleya-cors.headers.accesscontrolmaxage=86400'
+      - 'traefik.http.middlewares.stan-cataleya-cors.headers.addvaryheader=true'
+
+  rest:
+    image: postgrest/postgrest:v14.6
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command: postgrest
+    environment:
+      - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@db:5432/postgres
+      - PGRST_DB_SCHEMAS=public,storage,graphql_public
+      - PGRST_DB_MAX_ROWS=1000
+      - PGRST_DB_EXTRA_SEARCH_PATH=public,extensions
+      - PGRST_DB_ANON_ROLE=anon
+      - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - PGRST_DB_USE_LEGACY_GUCS=false
+      - PGRST_APP_SETTINGS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - PGRST_APP_SETTINGS_JWT_EXP=3600
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.stan-cataleya-rest.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/rest/v1`)'
+      - 'traefik.http.routers.stan-cataleya-rest.entrypoints=https'
+      - 'traefik.http.routers.stan-cataleya-rest.tls=true'
+      - 'traefik.http.routers.stan-cataleya-rest.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.stan-cataleya-rest.service=stan-cataleya-rest'
+      - 'traefik.http.routers.stan-cataleya-rest.middlewares=stan-cataleya-rest-path,stan-cataleya-cors'
+      - 'traefik.http.middlewares.stan-cataleya-rest-path.stripprefix.prefixes=/rest/v1'
+      - 'traefik.http.services.stan-cataleya-rest.loadbalancer.server.port=3000'
+      - 'traefik.http.routers.stan-cataleya-rest-http.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/rest/v1`)'
+      - 'traefik.http.routers.stan-cataleya-rest-http.entrypoints=http'
+      - 'traefik.http.routers.stan-cataleya-rest-http.middlewares=stan-cataleya-https'
+
+  storage:
+    image: supabase/storage-api:v1.44.2
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5000/status"]
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    environment:
+      - SERVER_PORT=5000
+      - SERVER_REGION=local
+      - MULTI_TENANT=false
+      - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@db:5432/postgres
+      - DB_INSTALL_ROLES=false
+      - STORAGE_BACKEND=file
+      - FILE_STORAGE_BACKEND_PATH=/var/lib/storage
+      - STORAGE_S3_BUCKET=stub
+      - UPLOAD_FILE_SIZE_LIMIT=104857600
+      - UPLOAD_FILE_SIZE_LIMIT_STANDARD=104857600
+      - UPLOAD_SIGNED_URL_EXPIRATION_TIME=120
+      - TUS_URL_PATH=/upload/resumable
+      - ENABLE_IMAGE_TRANSFORMATION=false
+      - DATABASE_SEARCH_PATH=storage
+      - NODE_ENV=production
+      - REQUEST_ALLOW_X_FORWARDED_PATH=true
+      - ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - POSTGREST_URL=http://rest:3000
+      - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - STORAGE_PUBLIC_URL=https://baza-cataleya.klubapp.hr
+      - TENANT_ID=stub
+    volumes:
+      - datoteke:/var/lib/storage
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.stan-cataleya-storage.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/storage/v1`)'
+      - 'traefik.http.routers.stan-cataleya-storage.entrypoints=https'
+      - 'traefik.http.routers.stan-cataleya-storage.tls=true'
+      - 'traefik.http.routers.stan-cataleya-storage.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.stan-cataleya-storage.service=stan-cataleya-storage'
+      - 'traefik.http.routers.stan-cataleya-storage.middlewares=stan-cataleya-storage-path,stan-cataleya-cors'
+      - 'traefik.http.middlewares.stan-cataleya-storage-path.stripprefix.prefixes=/storage/v1'
+      - 'traefik.http.services.stan-cataleya-storage.loadbalancer.server.port=5000'
+      - 'traefik.http.routers.stan-cataleya-storage-http.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/storage/v1`)'
+      - 'traefik.http.routers.stan-cataleya-storage-http.entrypoints=http'
+      - 'traefik.http.routers.stan-cataleya-storage-http.middlewares=stan-cataleya-https'
+
+  realtime:
+    image: supabase/realtime:v2.76.5
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - PORT=4000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=supabase_admin
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_NAME=postgres
+      - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
+      - DB_ENC_KEY=${REALTIME_DB_ENC_KEY}
+      - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - SECRET_KEY_BASE=${SERVICE_PASSWORD_64_REALTIME}
+      - METRICS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - ERL_AFLAGS=-proto_dist inet_tcp
+      - DNS_NODES=''
+      - RLIMIT_NOFILE=10000
+      - APP_NAME=realtime
+      - SEED_SELF_HOST=true
+      # stanar se prepoznaje po prvom dijelu adrese: baza-cataleya.klubapp.hr → baza-cataleya
+      - SELF_HOST_TENANT_NAME=baza-cataleya
+      - LOG_LEVEL=error
+      - RUN_JANITOR=true
+      - JANITOR_INTERVAL=60000
+      - DISABLE_HEALTHCHECK_LOGGING=true
+    command: >
+      sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.stan-cataleya-realtime.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/realtime/v1`)'
+      - 'traefik.http.routers.stan-cataleya-realtime.entrypoints=https'
+      - 'traefik.http.routers.stan-cataleya-realtime.tls=true'
+      - 'traefik.http.routers.stan-cataleya-realtime.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.stan-cataleya-realtime.service=stan-cataleya-realtime'
+      - 'traefik.http.routers.stan-cataleya-realtime.middlewares=stan-cataleya-realtime-path,stan-cataleya-realtime-add,stan-cataleya-cors'
+      - 'traefik.http.middlewares.stan-cataleya-realtime-path.stripprefix.prefixes=/realtime/v1'
+      - 'traefik.http.middlewares.stan-cataleya-realtime-add.addprefix.prefix=/socket'
+      - 'traefik.http.services.stan-cataleya-realtime.loadbalancer.server.port=4000'
+      - 'traefik.http.routers.stan-cataleya-realtime-http.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/realtime/v1`)'
+      - 'traefik.http.routers.stan-cataleya-realtime-http.entrypoints=http'
+      - 'traefik.http.routers.stan-cataleya-realtime-http.middlewares=stan-cataleya-https'
+
+  # Serverski dio Cataleye (supabase/functions/api): prijava PIN-om, izmjene, logo, obavijesti
+  api:
+    image: denoland/deno:alpine-2.9.7
+    restart: unless-stopped
+    depends_on:
+      rest:
+        condition: service_started
+    environment:
+      - SUPABASE_URL=https://baza-cataleya.klubapp.hr
+      - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT:-}
+      - KOD=https://raw.githubusercontent.com/brazzadevelopment/Cataleya/${CATALEYA_REF:-main}/supabase/functions/api/index.ts
+    command: ["sh", "-c", "exec deno run --allow-net --allow-env --reload $$KOD"]
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.stan-cataleya-api.rule=Host(`baza-cataleya.klubapp.hr`) && PathPrefix(`/functions/v1`)'
+      - 'traefik.http.routers.stan-cataleya-api.entrypoints=https'
+      - 'traefik.http.routers.stan-cataleya-api.tls=true'
+      - 'traefik.http.routers.stan-cataleya-api.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.stan-cataleya-api.service=stan-cataleya-api'
+      - 'traefik.http.routers.stan-cataleya-api.middlewares=stan-cataleya-api-path'
+      - 'traefik.http.middlewares.stan-cataleya-api-path.stripprefix.prefixes=/functions/v1'
+      - 'traefik.http.services.stan-cataleya-api.loadbalancer.server.port=8000'
+
+  # Aplikacija (web): gradi se iz repozitorija pri pokretanju, poslužuje na cataleya.klubapp.hr
+  web:
+    image: node:22-alpine
+    restart: unless-stopped
+    environment:
+      - VITE_SUPABASE_URL=https://baza-cataleya.klubapp.hr
+      - VITE_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - REF=${CATALEYA_REF:-main}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 300s
+    command: ["sh", "-c", "apk add --no-cache git >/dev/null && rm -rf /app && git clone --depth 1 --branch $$REF https://github.com/brazzadevelopment/Cataleya /app && cd /app && npm ci --no-audit --no-fund && npx vite build && exec npx --yes serve@14.2.4 -s dist -l 3000"]
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.cataleya-web.rule=Host(`cataleya.klubapp.hr`)'
+      - 'traefik.http.routers.cataleya-web.entrypoints=https'
+      - 'traefik.http.routers.cataleya-web.tls=true'
+      - 'traefik.http.routers.cataleya-web.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.cataleya-web.service=cataleya-web'
+      - 'traefik.http.services.cataleya-web.loadbalancer.server.port=3000'
+      - 'traefik.http.routers.cataleya-web-http.rule=Host(`cataleya.klubapp.hr`)'
+      - 'traefik.http.routers.cataleya-web-http.entrypoints=http'
+      - 'traefik.http.routers.cataleya-web-http.middlewares=stan-cataleya-https'
+
+volumes:
+  baza-podaci:
+  baza-postavke:
+  datoteke:

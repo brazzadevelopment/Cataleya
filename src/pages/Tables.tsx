@@ -107,7 +107,7 @@ const PLACED_PLURAL = ['', 'Prvoplasirani', 'Drugoplasirani', 'Trećeplasirani',
 
 function bracketBadge(bracket: string | undefined): string {
   if (bracket === undefined) return 'text-white/60';
-  if (bracket === 'B') return 'bg-bloom-cyan text-pitch-950';
+  if (bracket === 'B') return 'bg-bloom-cyan text-ink';
   return 'bg-brand text-white';
 }
 

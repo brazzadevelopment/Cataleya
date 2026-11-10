@@ -31,7 +31,7 @@ export function ShareButton({ title, text, url, className = '' }: { title: strin
         <Button onClick={share} className="flex-1">
           <Icon name="share" className="size-4" /> Podijeli
         </Button>
-        <a href={wa} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#25d366] px-4 text-sm font-extrabold text-pitch-950">
+        <a href={wa} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#25d366] px-4 text-sm font-extrabold text-ink">
           WhatsApp
         </a>
       </div>

@@ -161,7 +161,7 @@ function Podium({ places }: { places: { place: number; name: string }[] }) {
           <div key={pl} className="flex flex-col items-center text-center">
             {pl === 1 && <Icon name="trophy" className="mb-1 size-8 text-gold" />}
             <span className="mb-2 line-clamp-2 min-h-8 text-[12px] font-bold leading-tight">{p?.name ?? ''}</span>
-            <div className={`${heights[pl]} heading grid w-full place-items-center rounded-t-xl text-2xl ${pl === 1 ? 'bg-gold text-pitch-950' : 'bg-white/12'}`}>
+            <div className={`${heights[pl]} heading grid w-full place-items-center rounded-t-xl text-2xl ${pl === 1 ? 'bg-gold text-ink' : 'bg-white/12'}`}>
               {pl}.
             </div>
           </div>

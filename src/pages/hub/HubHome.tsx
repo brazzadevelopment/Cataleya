@@ -94,8 +94,8 @@ export function HubHome() {
 function Intro() {
   return (
     <section className="card relative overflow-hidden px-5 pb-6 pt-7 text-center">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(67_150_100_/_0.35),transparent_70%)]" />
-      <img src="/logo.svg" alt="" className="relative mx-auto size-24 drop-shadow-[0_0_24px_rgb(67_150_100_/_0.6)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(255_255_255_/_0.22),transparent_70%)]" />
+      <img src="/logo.svg" alt="" className="relative mx-auto size-24 drop-shadow-[0_0_24px_rgb(255_255_255_/_0.22)]" />
       <h1 className="heading relative mt-3 text-[28px] leading-none">Cataleya Cup</h1>
       <p className="relative mt-3 text-sm text-white/70">Međunarodni nogometni turnir za djecu. Raspored, rezultati uživo, tablice i ždrijeb.</p>
     </section>
@@ -107,12 +107,12 @@ function Hero({ t, liveCount }: { t: Tournament; liveCount: number }) {
   const days = daysUntil(t.start_date);
   return (
     <Link to={`/t/${t.slug}`} className="card relative block overflow-hidden px-5 pb-6 pt-6 text-center">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(67_150_100_/_0.38),transparent_70%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(255_255_255_/_0.22),transparent_70%)]" />
       <div className="relative">
         <div className="text-[12px] font-extrabold tracking-[0.22em] text-brand-soft uppercase">
           {status === 'live' ? 'Turnir je u tijeku' : 'Sljedeći turnir'}
         </div>
-        <img src={assetUrl(t.logo_path) ?? '/logo.svg'} alt="" className="mx-auto mt-3 size-20 object-contain drop-shadow-[0_0_24px_rgb(67_150_100_/_0.6)]" />
+        <img src={assetUrl(t.logo_path) ?? '/logo.svg'} alt="" className="mx-auto mt-3 size-20 object-contain drop-shadow-[0_0_24px_rgb(255_255_255_/_0.22)]" />
         <h1 className="heading mt-3 text-[26px] leading-tight">{t.name}</h1>
         <p className="mt-2 text-sm text-white/70">{dateSpan(t.start_date, t.end_date)}{t.place ? ` · ${t.place}` : ''}</p>
         {status === 'live' ? (

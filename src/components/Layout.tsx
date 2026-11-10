@@ -22,7 +22,7 @@ export function Layout() {
             <Icon name="back" className="size-5" />
           </NavLink>
           <NavLink to={base} className="flex min-w-0 items-center gap-3">
-            <Emblem className="size-11 drop-shadow-[0_0_12px_rgb(67_150_100_/_0.5)]" />
+            <Emblem className="size-11 drop-shadow-[0_0_12px_rgb(255_255_255_/_0.22)]" />
             <div className="min-w-0 leading-none">
               <div className="heading truncate text-[19px]">{snap.tournament.name}</div>
               <div className="mt-1 truncate text-[11px] font-semibold tracking-[0.18em] text-white/60 uppercase">

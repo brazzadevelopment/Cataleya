@@ -18,7 +18,7 @@ export function HubLayout() {
       <header className="sticky top-0 z-20 border-b border-line bg-pitch-950/85 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
         <div className="flex items-center gap-3">
           <NavLink to="/" className="flex min-w-0 items-center gap-3">
-            <img src="/logo.svg" alt="" className="size-11 drop-shadow-[0_0_12px_rgb(1_156_97_/_0.5)]" />
+            <img src="/logo.svg" alt="" className="size-11 drop-shadow-[0_0_12px_rgb(67_150_100_/_0.5)]" />
             <div className="min-w-0 leading-none">
               <div className="heading truncate text-[19px]">Cataleya Cup</div>
               <div className="mt-1 truncate text-[11px] font-semibold tracking-[0.18em] text-white/60 uppercase">Službena aplikacija</div>

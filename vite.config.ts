@@ -17,7 +17,7 @@ export default defineConfig({
         lang: 'hr',
         start_url: '/',
         display: 'standalone',
-        background_color: '#019c61',
+        background_color: '#061a10',
         theme_color: '#061a10',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },

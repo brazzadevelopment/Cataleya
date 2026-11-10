@@ -26,8 +26,8 @@ export function Home() {
   return (
     <div>
       <section className="card relative mb-2 overflow-hidden px-5 pb-5 pt-6 text-center">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(1_156_97_/_0.32),transparent_70%)]" />
-        <Emblem className="relative mx-auto size-24 drop-shadow-[0_0_24px_rgb(1_156_97_/_0.6)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(67_150_100_/_0.32),transparent_70%)]" />
+        <Emblem className="relative mx-auto size-24 drop-shadow-[0_0_24px_rgb(67_150_100_/_0.6)]" />
         <h1 className="heading relative mt-3 text-[30px] leading-none">{t.name}</h1>
         <p className="relative mt-2 text-[13px] font-bold tracking-[0.22em] text-brand-soft uppercase">
           {categoryTitle(snap.categories.find((c) => c.id === categoryId))}

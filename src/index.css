@@ -5,8 +5,8 @@
 @import '@fontsource/montserrat/800.css';
 @import '@fontsource/montserrat/900.css';
 
-/* Boje Cataleya Cupa: zelena iz grba (#019C61), tamnozelena podloga.
-   Žuta samo za zvjezdice i pehare; cvijet u duginim bojama za naglaske. */
+/* Boje Cataleya Cupa: svijetlozelena (#439664), tamnozelena podloga, logo je cvijet
+   u duginim bojama. Žuta samo za zvjezdice i pehare. */
 @theme {
   --font-sans: 'Montserrat', system-ui, sans-serif;
 
@@ -18,9 +18,9 @@
   --color-pitch-600: #1f6a43;
   --color-line: rgb(255 255 255 / 0.1);
 
-  --color-brand: #019c61;
-  --color-brand-deep: #017a4c;
-  --color-brand-soft: #3fd193;
+  --color-brand: #439664;
+  --color-brand-deep: #357a50;
+  --color-brand-soft: #6cc48f;
   --color-gold: #f2c230;
   --color-gold-soft: #f7d873;
   --color-bloom-pink: #ff4fa3;
@@ -37,7 +37,7 @@
   body {
     @apply bg-pitch-950 font-sans text-white antialiased;
     background-image:
-      radial-gradient(120% 60% at 50% -10%, rgb(1 156 97 / 0.42), transparent 60%),
+      radial-gradient(120% 60% at 50% -10%, rgb(67 150 100 / 0.42), transparent 60%),
       repeating-linear-gradient(115deg, rgb(255 255 255 / 0.018) 0 14px, transparent 14px 28px);
     background-attachment: fixed;
     min-height: 100dvh;

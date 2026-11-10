@@ -102,7 +102,7 @@ export function TournamentTab() {
       </Field>
 
       <label className="flex items-center gap-3 text-[14px] font-semibold">
-        <input type="checkbox" checked={t.is_published} onChange={(e) => set('is_published', e.target.checked)} className="size-5 accent-[#019c61]" />
+        <input type="checkbox" checked={t.is_published} onChange={(e) => set('is_published', e.target.checked)} className="size-5 accent-[#439664]" />
         Turnir je javan (vidljiv na početnoj Cataleya Cupa)
       </label>
 

@@ -32,13 +32,13 @@ export function TeamsTab() {
 
   return (
     <div>
-      <SectionTitle action={<button type="button" onClick={() => setEditCat('new')} className="text-[12px] font-bold text-gold">+ Kategorija</button>}>
+      <SectionTitle action={<button type="button" onClick={() => setEditCat('new')} className="text-[12px] font-bold text-brand-soft">+ Kategorija</button>}>
         Kategorije
       </SectionTitle>
       <div className="flex flex-wrap gap-2">
         {snap.categories.map((c) => (
           <button key={c.id} type="button" onClick={() => (c.id === categoryId ? setEditCat(c) : setCategoryId(c.id))}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-bold ${c.id === categoryId ? 'bg-gold text-pitch-950' : 'bg-white/8 ring-1 ring-white/12'}`}>
+            className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-bold ${c.id === categoryId ? 'bg-brand text-white' : 'bg-white/8 ring-1 ring-white/12'}`}>
             {c.name}{c.id === categoryId && <Icon name="edit" className="size-3.5" />}
           </button>
         ))}
@@ -51,7 +51,7 @@ export function TeamsTab() {
           <section key={g?.id ?? 'none'}>
             <SectionTitle action={
               <span className="flex gap-3">
-                <button type="button" onClick={() => setBulk({ groupId: g?.id ?? null })} className="text-[12px] font-bold text-gold">+ Momčadi</button>
+                <button type="button" onClick={() => setBulk({ groupId: g?.id ?? null })} className="text-[12px] font-bold text-brand-soft">+ Momčadi</button>
                 {g && list.length === 0 && (
                   <button type="button" onClick={() => save([{ type: 'delete', table: 'groups', id: g.id }])} className="text-[12px] font-bold text-white/45">Obriši</button>
                 )}

@@ -40,7 +40,7 @@ export function ScheduleTab() {
                 <div className="min-w-0 flex-1 text-[13px] leading-snug">
                   <div className="truncate font-bold">{sideLabel(snap, m, 'home').name}</div>
                   <div className="truncate font-bold">{sideLabel(snap, m, 'away').name}</div>
-                  <div className="truncate text-[11px] text-gold/80">{matchPhase(snap, m)}</div>
+                  <div className="truncate text-[11px] text-brand-soft/80">{matchPhase(snap, m)}</div>
                 </div>
                 <Icon name="edit" className="size-4 shrink-0 text-white/40" />
               </button>

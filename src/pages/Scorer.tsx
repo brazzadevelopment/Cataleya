@@ -25,7 +25,7 @@ export function ScorerList({ embedded = false }: { embedded?: boolean }) {
     <div>
       <div className={`flex items-center gap-2 ${embedded ? 'hidden' : ''}`}>
         <h1 className="heading text-lg">Zapisnik · {fieldName(snap, fieldId)}</h1>
-        <Link to={`${base}/upute-zapisnicar`} className="ml-auto text-[12px] font-bold text-gold">Upute</Link>
+        <Link to={`${base}/upute-zapisnicar`} className="ml-auto text-[12px] font-bold text-brand-soft">Upute</Link>
         <button type="button" onClick={() => setSession(null)} className="inline-flex h-9 items-center gap-1 pl-2 text-[12px] font-bold text-white/55">
           <Icon name="logout" className="size-4" /> Odjava
         </button>
@@ -33,7 +33,7 @@ export function ScorerList({ embedded = false }: { embedded?: boolean }) {
       {session.role === 'admin' && (
         <div className="mt-3 flex flex-wrap gap-2">
           {snap.fields.map((f) => <Chip key={f.id} active={f.id === fieldId} onClick={() => setField(f.id)}>{f.name}</Chip>)}
-          {!embedded && <Link to={`${base}/admin`} className="ml-auto self-center text-[12px] font-bold text-gold">Uređivanje →</Link>}
+          {!embedded && <Link to={`${base}/admin`} className="ml-auto self-center text-[12px] font-bold text-brand-soft">Uređivanje →</Link>}
         </div>
       )}
 
@@ -67,7 +67,7 @@ function ScorerRow({ m, today }: { m: Match; today: string }) {
         <div className="truncate">{sideLabel(snap, m, 'away').name}</div>
       </div>
       <div className="text-right text-lg font-black tabular-nums">
-        {hasScore(m) ? <>{m.home_score}<br />{m.away_score}</> : <Icon name="edit" className="size-5 text-gold" />}
+        {hasScore(m) ? <>{m.home_score}<br />{m.away_score}</> : <Icon name="edit" className="size-5 text-brand-soft" />}
       </div>
     </Link>
   );
@@ -142,7 +142,7 @@ export function ScoreEntry() {
         <Icon name="back" className="size-4" /> Sve utakmice
       </Link>
       <div className="text-center">
-        <div className="text-[12px] font-extrabold tracking-[0.18em] text-gold uppercase">{matchPhase(snap, m)}</div>
+        <div className="text-[12px] font-extrabold tracking-[0.18em] text-brand-soft uppercase">{matchPhase(snap, m)}</div>
         <div className="mt-1 text-[13px] text-white/60">{[matchTime(snap, m), fieldName(snap, m.field_id)].filter(Boolean).join(' · ')}</div>
         <div className="mt-2">{draft.status === 'live' ? <LiveBadge /> : <span className="text-[12px] font-bold text-white/55 uppercase">{{ scheduled: 'Nije počela', finished: 'Završena', cancelled: 'Otkazana', live: '' }[draft.status]}</span>}</div>
       </div>
@@ -157,7 +157,7 @@ export function ScoreEntry() {
               onClick={() => bump(side, 'score', 1)}
               disabled={draft.status === 'finished' || draft.status === 'cancelled'}
               aria-label={`Gol za ${(side === 'home' ? home : away).name}`}
-              className="grid h-20 w-full place-items-center rounded-2xl bg-gold text-pitch-950 transition active:scale-95 disabled:opacity-30"
+              className="grid h-20 w-full place-items-center rounded-2xl bg-brand text-white transition active:scale-95 disabled:opacity-30"
             >
               <Icon name="plus" className="size-10" strokeWidth={3} />
             </button>
@@ -175,7 +175,7 @@ export function ScoreEntry() {
       </div>
 
       {msg && (
-        <p className={`mt-3 text-center text-[13px] font-bold ${msg.tone === 'ok' ? 'text-[#7ee2a8]' : msg.tone === 'warn' ? 'text-gold' : 'text-[#ff8197]'}`}>{msg.text}</p>
+        <p className={`mt-3 text-center text-[13px] font-bold ${msg.tone === 'ok' ? 'text-[#7ee2a8]' : msg.tone === 'warn' ? 'text-brand-soft' : 'text-[#ff8197]'}`}>{msg.text}</p>
       )}
 
       {started && (
@@ -206,13 +206,13 @@ export function ScoreEntry() {
             <Button variant="ghost" className="w-full" onClick={() => setShowPens(true)}>Jedanaesterci</Button>
           ) : (
             <>
-              <div className="mb-2 text-center text-[12px] font-extrabold tracking-wider text-gold uppercase">Jedanaesterci</div>
+              <div className="mb-2 text-center text-[12px] font-extrabold tracking-wider text-brand-soft uppercase">Jedanaesterci</div>
               <div className="grid grid-cols-2 gap-3">
                 {(['home', 'away'] as const).map((side) => (
                   <div key={side} className="flex items-center justify-between gap-2">
                     <button type="button" onClick={() => bump(side, 'penalties', -1)} className="grid size-11 place-items-center rounded-xl bg-white/8 ring-1 ring-white/12" aria-label="Manje"><Icon name="minus" className="size-5" /></button>
                     <span className="heading text-3xl tabular-nums">{draft[`${side}_penalties`] ?? 0}</span>
-                    <button type="button" onClick={() => bump(side, 'penalties', 1)} className="grid size-11 place-items-center rounded-xl bg-gold text-pitch-950" aria-label="Više"><Icon name="plus" className="size-5" /></button>
+                    <button type="button" onClick={() => bump(side, 'penalties', 1)} className="grid size-11 place-items-center rounded-xl bg-brand text-white" aria-label="Više"><Icon name="plus" className="size-5" /></button>
                   </div>
                 ))}
               </div>
@@ -231,7 +231,7 @@ export function ScoreEntry() {
           </Button>
         )}
         {draft.status === 'live' && needsPens && (
-          <p className="text-center text-[13px] font-bold text-gold">Neriješeno: upiši jedanaesterce, pa završi utakmicu.</p>
+          <p className="text-center text-[13px] font-bold text-brand-soft">Neriješeno: upiši jedanaesterce, pa završi utakmicu.</p>
         )}
         {draft.status === 'live' && (
           <Button onClick={() => save({ ...draft, status: 'finished' })} disabled={needsPens} className="h-14 text-base">

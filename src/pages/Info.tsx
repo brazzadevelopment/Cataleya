@@ -45,7 +45,7 @@ export function Info() {
           return (
             <div key={venue} className="card">
               <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-                <Icon name="pin" className="size-5 text-gold" />
+                <Icon name="pin" className="size-5 text-brand-soft" />
                 <div className="min-w-0 flex-1">
                   <div className="font-bold">{venue || 'Tereni'}</div>
                   {cats.length > 0 && <div className="text-[12px] text-white/55">{cats.map((c) => c.name).join(', ')} godište</div>}
@@ -54,7 +54,7 @@ export function Info() {
               {fs.map((f) => (
                 <div key={f.id} className="flex items-center gap-3 px-4 py-2 text-[14px]">
                   <span className="flex-1 text-white/80">{f.name}</span>
-                  {f.maps_url && <a href={f.maps_url} target="_blank" rel="noreferrer" className="text-[13px] font-bold text-gold">Karta</a>}
+                  {f.maps_url && <a href={f.maps_url} target="_blank" rel="noreferrer" className="text-[13px] font-bold text-brand-soft">Karta</a>}
                 </div>
               ))}
             </div>

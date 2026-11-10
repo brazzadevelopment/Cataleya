@@ -48,7 +48,7 @@ const tournament: Tournament = {
   start_date: '2026-10-23',
   end_date: '2026-10-25',
   timezone: TZ,
-  logo_path: '/emblem.svg',
+  logo_path: '/logo.svg',
   cover_path: null,
   color_primary: '#0f3d24',
   color_secondary: '#f2c230',

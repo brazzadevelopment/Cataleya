@@ -104,7 +104,7 @@ export function MatchEditor({ match, stage, onClose }: { match?: Match; stage?: 
           const teamKey = `${side}_team_id` as const;
           return (
             <div key={side} className="card space-y-2 p-3">
-              <div className="text-[12px] font-extrabold tracking-wider text-gold uppercase">{side === 'home' ? 'Domaćin' : 'Gost'}</div>
+              <div className="text-[12px] font-extrabold tracking-wider text-brand-soft uppercase">{side === 'home' ? 'Domaćin' : 'Gost'}</div>
               {knockout && (
                 <Field label="Tko ulazi (pravilo)" hint="1A = 1. u skupini A · 2#6 = 6. najbolji drugoplasirani · W:OS1 = pobjednik OS1 · L:PF1 = poraženi PF1">
                   <Input value={m[srcKey] ?? ''} onChange={(e) => set(srcKey, e.target.value || null)} placeholder="npr. 1A" className={sourceOk(m[srcKey]) ? '' : 'ring-live'} />

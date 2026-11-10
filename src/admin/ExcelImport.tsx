@@ -99,7 +99,7 @@ export function ExcelImport({ onClose }: { onClose(): void }) {
           <input type="file" accept=".xlsx,.csv" className="hidden" onChange={(e) => void read(e.target.files?.[0])} />
         </label>
 
-        {warnings.map((w) => <p key={w} className="font-semibold text-gold">{w}</p>)}
+        {warnings.map((w) => <p key={w} className="font-semibold text-brand-soft">{w}</p>)}
 
         {rows && rows.length > 0 && (
           <>
@@ -109,7 +109,7 @@ export function ExcelImport({ onClose }: { onClose(): void }) {
               </p>
             )}
             {unknownFields.length > 0 && (
-              <p className="rounded-xl bg-gold/10 p-3 text-gold">Nepoznati tereni: <b>{unknownFields.join(', ')}</b>. Utakmice će biti bez terena.</p>
+              <p className="rounded-xl bg-brand/10 p-3 text-brand-soft">Nepoznati tereni: <b>{unknownFields.join(', ')}</b>. Utakmice će biti bez terena.</p>
             )}
             <div className="card max-h-72 divide-y divide-line overflow-y-auto">
               {rows.map((r, i) => {

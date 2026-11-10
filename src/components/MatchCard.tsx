@@ -19,13 +19,13 @@ export function MatchCard({ match: m, showPhase = true }: { match: Match; showPh
   return (
     <Link
       to={`/t/${snap.tournament.slug}/utakmica/${m.id}`}
-      className={`card block overflow-hidden transition active:scale-[0.99] ${live ? 'bloom-border' : ''} ${fav && !live ? 'ring-1 ring-gold/50' : ''}`}
+      className={`card block overflow-hidden transition active:scale-[0.99] ${live ? 'bloom-border' : ''} ${fav && !live ? 'ring-1 ring-brand/50' : ''}`}
     >
       <div className="flex items-center gap-2 border-b border-line px-3.5 py-2 text-[12px] font-semibold text-white/65">
         {live ? <LiveBadge /> : <span className="font-extrabold text-white/90 tabular-nums">{time ?? 'Termin nije poznat'}</span>}
         {live && time && <span className="tabular-nums">{time}</span>}
         {field && <span className="rounded-md bg-white/8 px-1.5 py-0.5 text-white/80">{field}</span>}
-        {showPhase && <span className="ml-auto truncate text-gold/90">{matchPhase(snap, m)}</span>}
+        {showPhase && <span className="ml-auto truncate text-brand-soft/90">{matchPhase(snap, m)}</span>}
         {m.status === 'cancelled' && <span className="ml-auto text-live">Otkazano</span>}
       </div>
       <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 px-3.5 py-2.5">
@@ -60,7 +60,7 @@ function Score({ value, pen, show, strong, live }: { value: number | null; pen: 
   return (
     <span className="flex w-8 items-baseline justify-end gap-1 tabular-nums">
       {pen != null && <span className="text-[11px] font-bold text-white/50">({pen})</span>}
-      <span className={`text-xl font-black ${live ? 'text-white' : strong ? 'text-gold' : 'text-white/85'}`}>{value}</span>
+      <span className={`text-xl font-black ${live ? 'text-white' : strong ? 'text-brand-soft' : 'text-white/85'}`}>{value}</span>
     </span>
   );
 }

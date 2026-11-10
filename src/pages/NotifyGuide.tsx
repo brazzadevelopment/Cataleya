@@ -11,7 +11,7 @@ function Steps({ children }: { children: ReactNode }) {
 
 function Step({ title, children }: { title: ReactNode; children?: ReactNode }) {
   return (
-    <li className="flex gap-3 px-4 py-3 [counter-increment:step] before:grid before:size-7 before:shrink-0 before:place-items-center before:rounded-full before:bg-gold before:text-[13px] before:font-black before:text-pitch-950 before:content-[counter(step)]">
+    <li className="flex gap-3 px-4 py-3 [counter-increment:step] before:grid before:size-7 before:shrink-0 before:place-items-center before:rounded-full before:bg-brand before:text-[13px] before:font-black before:text-white before:content-[counter(step)]">
       <div className="min-w-0 text-[14px] leading-relaxed">
         <div className="font-bold">{title}</div>
         {children && <div className="mt-0.5 text-white/70">{children}</div>}
@@ -52,7 +52,7 @@ export function NotifyGuide() {
 
       {installed && (
         <div className="card mt-4 flex items-center gap-2.5 p-3 text-[14px]">
-          <Icon name="check" className="size-5 text-gold" /> Aplikacija je već na početnom zaslonu. Samo uključi obavijesti ispod.
+          <Icon name="check" className="size-5 text-brand-soft" /> Aplikacija je već na početnom zaslonu. Samo uključi obavijesti ispod.
         </div>
       )}
 

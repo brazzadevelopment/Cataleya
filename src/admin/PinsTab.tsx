@@ -21,7 +21,7 @@ export function PinsTab() {
       <SectionTitle>Glavni PIN</SectionTitle>
       <PinRow fieldId={null} label="Organizator" />
 
-      <SectionTitle action={<button type="button" onClick={() => setEditField('new')} className="text-[12px] font-bold text-gold">+ Teren</button>}>
+      <SectionTitle action={<button type="button" onClick={() => setEditField('new')} className="text-[12px] font-bold text-brand-soft">+ Teren</button>}>
         Tereni
       </SectionTitle>
       <div className="space-y-3">
@@ -29,7 +29,7 @@ export function PinsTab() {
           <div key={f.id} className="card p-3">
             <div className="mb-2 flex items-center">
               <span className="font-extrabold">{f.name}</span>
-              {f.maps_url && <a href={f.maps_url} target="_blank" rel="noreferrer" className="ml-2 text-[12px] font-bold text-gold">karta</a>}
+              {f.maps_url && <a href={f.maps_url} target="_blank" rel="noreferrer" className="ml-2 text-[12px] font-bold text-brand-soft">karta</a>}
               <button type="button" onClick={() => setEditField(f)} className="ml-auto grid size-9 place-items-center rounded-lg text-white/50" aria-label="Uredi teren"><Icon name="edit" className="size-4" /></button>
             </div>
             <PinRow fieldId={f.id} label={`PIN za ${f.name}`} bare />

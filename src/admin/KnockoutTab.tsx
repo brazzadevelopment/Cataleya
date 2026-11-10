@@ -59,7 +59,7 @@ export function KnockoutTab() {
             <div className="card divide-y divide-line">
               {list.map((m) => (
                 <button key={m.id} type="button" onClick={() => setEditing(m)} className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left">
-                  <span className="w-10 shrink-0 text-[13px] font-black text-gold">{m.code ?? '—'}</span>
+                  <span className="w-10 shrink-0 text-[13px] font-black text-brand-soft">{m.code ?? '—'}</span>
                   <div className="min-w-0 flex-1 text-[13px] leading-snug">
                     {(['home', 'away'] as const).map((side) => {
                       const id = side === 'home' ? m.home_team_id : m.away_team_id;
@@ -110,7 +110,7 @@ function LotSection() {
       <p className="mb-3 text-[13px] text-white/65">Ove momčadi nijedan kriterij nije razdvojio. Upiši redoslijed iz ždrijeba (1 = bolji).</p>
       {tied.map(({ g, gts, rows }) => (
         <div key={g.id} className="card mb-3 p-3">
-          <div className="mb-2 text-[12px] font-extrabold text-gold uppercase">Skupina {g.name}</div>
+          <div className="mb-2 text-[12px] font-extrabold text-brand-soft uppercase">Skupina {g.name}</div>
           {rows.map((r) => {
             const gt = gts.find((x) => x.team_id === r.teamId)!;
             return (

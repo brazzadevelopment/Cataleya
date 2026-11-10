@@ -6,15 +6,15 @@ import { initials } from '../lib/view';
 
 export function Emblem({ className = 'size-10' }: { className?: string }) {
   const { snap } = useTournament();
-  return <img src={assetUrl(snap.tournament.logo_path) ?? '/emblem.svg'} alt="" className={`${className} object-contain`} />;
+  return <img src={assetUrl(snap.tournament.logo_path) ?? '/logo.svg'} alt="" className={`${className} object-contain`} />;
 }
 
 /** Naslov odjeljka kao na plakatu: žuti tekst i crta. */
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
     <div className="mb-3 mt-7 flex items-center gap-3 first:mt-2">
-      <h2 className="heading shrink-0 text-[15px] text-gold">{children}</h2>
-      <span className="h-0.5 flex-1 rounded bg-gold/70" />
+      <h2 className="heading shrink-0 text-[15px] text-brand-soft">{children}</h2>
+      <span className="h-0.5 flex-1 rounded bg-brand/70" />
       {action}
     </div>
   );
@@ -65,7 +65,7 @@ export function Button({
   children, variant = 'primary', className = '', ...rest
 }: { variant?: 'primary' | 'ghost' | 'danger' } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const styles = {
-    primary: 'bg-gold text-pitch-950 hover:bg-gold-soft',
+    primary: 'bg-brand text-white hover:bg-brand-deep',
     ghost: 'bg-white/8 text-white hover:bg-white/14 ring-1 ring-white/12',
     danger: 'bg-live/15 text-[#ff8197] ring-1 ring-live/40 hover:bg-live/25',
   }[variant];
@@ -82,7 +82,7 @@ export function Button({
 
 export function Chip({ active, children, onClick, to }: { active?: boolean; children: ReactNode; onClick?: () => void; to?: string }) {
   const cls = `inline-flex h-9 shrink-0 items-center rounded-full px-4 text-[13px] font-bold transition ${
-    active ? 'bg-gold text-pitch-950' : 'bg-white/8 text-white/80 ring-1 ring-white/12 hover:bg-white/14'
+    active ? 'bg-brand text-white' : 'bg-white/8 text-white/80 ring-1 ring-white/12 hover:bg-white/14'
   }`;
   return to ? <Link to={to} className={cls}>{children}</Link> : <button type="button" onClick={onClick} className={cls}>{children}</button>;
 }

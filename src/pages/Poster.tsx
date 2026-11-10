@@ -39,15 +39,15 @@ export function Poster() {
           fontSize: size === 'A4' ? '16px' : '11.3px',
         }}
       >
-        <img src={assetUrl(t.logo_path) ?? '/emblem.svg'} alt="" style={{ width: '9em', height: '9em' }} className="object-contain" />
+        <img src={assetUrl(t.logo_path) ?? '/logo.svg'} alt="" style={{ width: '9em', height: '9em' }} className="object-contain" />
         <h1 className="heading mt-[0.6em] text-[3.4em] leading-[0.95]">{t.name}</h1>
-        <p className="mt-[0.5em] text-[1.2em] font-bold tracking-[0.25em] text-gold uppercase">
+        <p className="mt-[0.5em] text-[1.2em] font-bold tracking-[0.25em] text-brand-soft uppercase">
           {snap.categories.map((c) => c.name).join(' · ')}
         </p>
         <p className="mt-[0.4em] text-[1.1em] text-white/80">{dateSpan(t.start_date, t.end_date)} · {t.place}</p>
 
         <div className="mt-auto flex flex-col items-center">
-          <p className="heading text-[2em] text-gold">Rezultati uživo</p>
+          <p className="heading text-[2em] text-brand-soft">Rezultati uživo</p>
           <p className="mt-[0.3em] text-[1.1em] text-white/80">Raspored · tablice · ždrijeb</p>
           <div className="mt-[1em] rounded-[1.2em] bg-white p-[0.8em]">
             {qr && <img src={qr} alt="" style={{ width: '15em', height: '15em' }} />}

@@ -125,7 +125,7 @@ export function Splash({ text }: { text: string }) {
   return (
     <div className="grid min-h-dvh place-items-center bg-pitch-950 p-8 text-center">
       <div>
-        <img src="/emblem.svg" alt="" className="mx-auto mb-4 size-20 animate-pulse" />
+        <img src="/logo.svg" alt="" className="mx-auto mb-4 size-20 animate-pulse" />
         <p className="text-white/80">{text}</p>
       </div>
     </div>

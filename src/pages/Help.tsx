@@ -10,7 +10,7 @@ function Steps({ children }: { children: ReactNode }) {
 
 function Step({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <li className="flex gap-3 px-4 py-3 [counter-increment:step] before:grid before:size-7 before:shrink-0 before:place-items-center before:rounded-full before:bg-gold before:text-[13px] before:font-black before:text-pitch-950 before:content-[counter(step)]">
+    <li className="flex gap-3 px-4 py-3 [counter-increment:step] before:grid before:size-7 before:shrink-0 before:place-items-center before:rounded-full before:bg-brand before:text-[13px] before:font-black before:text-white before:content-[counter(step)]">
       <div className="min-w-0 text-[14px] leading-relaxed">
         <div className="font-bold">{title}</div>
         {children && <div className="mt-0.5 text-white/70">{children}</div>}
@@ -57,7 +57,7 @@ export function HelpParents() {
           ['bracket', 'Ždrijeb', 'Osmina finala i dalje, posebno za A i B turnir. Momčadi se upisuju same kad završe skupine.'],
         ].map(([icon, title, text]) => (
           <div key={title} className="flex gap-3 px-4 py-3">
-            <Icon name={icon} className="mt-0.5 size-5 shrink-0 text-gold" />
+            <Icon name={icon} className="mt-0.5 size-5 shrink-0 text-brand-soft" />
             <div><b>{title}:</b> <span className="text-white/75">{text}</span></div>
           </div>
         ))}
@@ -65,9 +65,9 @@ export function HelpParents() {
 
       <SectionTitle>Dobro je znati</SectionTitle>
       <div className="space-y-3">
-        <Tip><b>Obavijesti na mobitel.</b> Za svaki gol, početak, kraj i karton tvojih momčadi. Uključuju se u Moje, a <Link to={`${base}/obavijesti`} className="font-bold text-gold">ovdje su upute i video</Link>.</Tip>
+        <Tip><b>Obavijesti na mobitel.</b> Za svaki gol, početak, kraj i karton tvojih momčadi. Uključuju se u Moje, a <Link to={`${base}/obavijesti`} className="font-bold text-brand-soft">ovdje su upute i video</Link>.</Tip>
         <Tip><b>Rezultat uživo.</b> Zapisničar uz teren upisuje golove, a rezultat se kod tebe osvježi sam za sekundu-dvije. Ne treba osvježavati stranicu.</Tip>
-        <Tip><b>Gdje je teren?</b> Otvori utakmicu: piše teren i lokacija. Popis svih terena je u <Link to={`${base}/info`} className="font-bold text-gold">O turniru</Link>.</Tip>
+        <Tip><b>Gdje je teren?</b> Otvori utakmicu: piše teren i lokacija. Popis svih terena je u <Link to={`${base}/info`} className="font-bold text-brand-soft">O turniru</Link>.</Tip>
         <Tip><b>Podijeli.</b> Svaka utakmica i momčad ima gumb Podijeli (WhatsApp, Instagram, link).</Tip>
         <Tip><b>Privatnost.</b> Aplikacija ne sprema imena ni podatke djece. Tvoje zvjezdice ostaju samo na tvom mobitelu.</Tip>
         <Tip><b>Nešto ne štima?</b> Ako je rezultat ili raspored pogrešan, javi se organizatoru turnira. Samo organizator i zapisničari mogu mijenjati podatke.</Tip>
@@ -92,7 +92,7 @@ export function HelpScorekeeper() {
       <Steps>
         <Step title="Uzmi PIN od organizatora">Svaki teren ima svoj PIN. S njim vidiš i upisuješ samo utakmice svog terena.</Step>
         <Step title="Prijavi se">
-          Otvori aplikaciju, gore desno dodirni ključić (ili na dnu početne <Link to={`${base}/prijava`} className="font-bold text-gold">Prijava</Link>) i upiši PIN. Ostaješ prijavljen do kraja turnira, pa se ne odjavljuj.
+          Otvori aplikaciju, gore desno dodirni ključić (ili na dnu početne <Link to={`${base}/prijava`} className="font-bold text-brand-soft">Prijava</Link>) i upiši PIN. Ostaješ prijavljen do kraja turnira, pa se ne odjavljuj.
         </Step>
         <Step title="Provjeri popis">Vidiš utakmice svog terena, sljedeća je na vrhu. Provjeri jesu li momčadi i vrijeme točni.</Step>
       </Steps>

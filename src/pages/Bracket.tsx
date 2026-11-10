@@ -47,15 +47,15 @@ function BracketSection({ title, matches: ko }: { title: string; matches: Match[
             <div className="flex gap-0" style={{ minHeight: height + 28 }}>
               {columns.map((col, ci) => (
                 <div key={col.stage} className={`flex shrink-0 flex-col ${columns.length === 1 ? "w-full" : "w-[196px]"}`}>
-                  <div className="mb-2 h-5 text-center text-[11px] font-extrabold tracking-wider text-gold uppercase">
+                  <div className="mb-2 h-5 text-center text-[11px] font-extrabold tracking-wider text-brand-soft uppercase">
                     {STAGE_LABEL[col.stage]}
                   </div>
                   <div className="flex flex-1 flex-col justify-around" style={{ height }}>
                     {col.matches.map((m) => (
                       <div key={m.id} className="relative flex items-center">
-                        {ci > 0 && <span className="absolute -left-3 top-1/2 h-px w-3 bg-gold/40" />}
+                        {ci > 0 && <span className="absolute -left-3 top-1/2 h-px w-3 bg-brand/40" />}
                         <BracketNode match={m} />
-                        {ci < columns.length - 1 && <span className="absolute -right-3 top-1/2 h-px w-3 bg-gold/40" />}
+                        {ci < columns.length - 1 && <span className="absolute -right-3 top-1/2 h-px w-3 bg-brand/40" />}
                       </div>
                     ))}
                   </div>
@@ -102,12 +102,12 @@ function BracketNode({ match: m }: { match: Match }) {
   return (
     <Link to={`/t/${snap.tournament.slug}/utakmica/${m.id}`} className={`card block w-full overflow-hidden ${m.status === 'live' ? 'bloom-border' : ''}`}>
       <div className="flex items-center justify-between gap-1 px-2.5 pt-1.5 text-[10px] font-bold text-white/55">
-        <span className="text-gold/90">{m.code}</span>
+        <span className="text-brand-soft/90">{m.code}</span>
         {m.status === 'live' ? <LiveBadge /> : <span className="truncate">{[time?.split(' – ')[0], field].filter(Boolean).join(' · ')}</span>}
       </div>
       {sides.map((s) => (
         <div key={s.side} className={`flex items-center gap-1.5 px-2.5 py-1 ${s.lost ? 'opacity-50' : ''}`}>
-          <span className={`min-w-0 flex-1 truncate text-[13px] ${s.label.known ? 'font-bold' : 'italic text-white/55'} ${s.won ? 'text-gold' : ''}`}>
+          <span className={`min-w-0 flex-1 truncate text-[13px] ${s.label.known ? 'font-bold' : 'italic text-white/55'} ${s.won ? 'text-brand-soft' : ''}`}>
             {s.label.name}
             {s.label.provisional && (
               <span className="block truncate text-[12px] font-bold not-italic text-white/80">
@@ -137,7 +137,7 @@ export function FinalStandings() {
           <div className="card mt-4 divide-y divide-line">
             {places.map((p) => (
               <div key={`${p.place}-${p.teamId}`} className="flex items-center gap-3 px-4 py-3">
-                <span className={`heading w-9 text-lg ${p.place <= 3 ? 'text-gold' : 'text-white/60'}`}>{p.place}.</span>
+                <span className={`heading w-9 text-lg ${p.place <= 3 ? 'text-brand-soft' : 'text-white/60'}`}>{p.place}.</span>
                 <TeamBadge name={teamName(snap, p.teamId) ?? '?'} />
                 <span className="font-bold">{teamName(snap, p.teamId)}</span>
               </div>

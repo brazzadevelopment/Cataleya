@@ -28,7 +28,7 @@ export function Mine() {
         <>
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {favTeams.map((t) => (
-              <Link key={t.id} to={`${base}/momcad/${t.id}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-gold/12 py-1 pl-1.5 pr-1 ring-1 ring-gold/35">
+              <Link key={t.id} to={`${base}/momcad/${t.id}`} className="flex shrink-0 items-center gap-1.5 rounded-full bg-brand/12 py-1 pl-1.5 pr-1 ring-1 ring-brand/35">
                 <TeamBadge name={t.name} size="size-7" />
                 <span className="text-[13px] font-bold">{t.name}</span>
                 <StarButton teamId={t.id} className="size-7 [&_svg]:size-4" />

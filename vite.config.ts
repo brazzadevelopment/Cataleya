@@ -9,15 +9,15 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['emblem.svg', 'apple-touch-icon.png'],
+      includeAssets: ['logo.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Cataleya Cup 2026',
+        name: 'Cataleya Cup',
         short_name: 'Cataleya Cup',
-        description: 'Raspored, rezultati uživo, tablice i ždrijeb.',
+        description: 'Službena aplikacija Cataleya Cupa: raspored, rezultati uživo, tablice i ždrijeb.',
         lang: 'hr',
         start_url: '/',
         display: 'standalone',
-        background_color: '#061a10',
+        background_color: '#019c61',
         theme_color: '#061a10',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },

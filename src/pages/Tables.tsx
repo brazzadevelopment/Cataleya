@@ -60,7 +60,7 @@ export function Tables() {
                   {table.rows.map((r, i) => {
                     const goesTo = !r.needsLot ? advancing.get(`${r.rank}${g.name}`) : undefined;
                     return (
-                      <tr key={r.teamId} className={`border-b border-line last:border-0 ${favorites.has(r.teamId) ? 'bg-gold/8' : ''}`}>
+                      <tr key={r.teamId} className={`border-b border-line last:border-0 ${favorites.has(r.teamId) ? 'bg-brand/8' : ''}`}>
                         <td className="py-2.5 pl-3">
                           <span className={`grid size-6 place-items-center rounded-md text-[12px] font-extrabold ${bracketBadge(goesTo)}`}>
                             {table.rows.some((x) => x.played) ? r.rank : i + 1}
@@ -69,7 +69,7 @@ export function Tables() {
                         <td className="py-2 pr-1">
                           <Link to={`${base}/momcad/${r.teamId}`} className="flex items-center gap-1">
                             <span className="text-[13.5px] leading-tight font-bold">{teamName(snap, r.teamId)}</span>
-                            {r.needsLot && table.complete && <span className="shrink-0 text-gold" title="Potreban ždrijeb">*</span>}
+                            {r.needsLot && table.complete && <span className="shrink-0 text-brand-soft" title="Potreban ždrijeb">*</span>}
                           </Link>
                         </td>
                         <td className="text-center text-white/70">{r.played}</td>
@@ -85,7 +85,7 @@ export function Tables() {
               </table>
             </div>
             {table.complete && table.needsLot && (
-              <p className="mt-2 text-[12px] text-gold">* Momčadi su potpuno izjednačene. Redoslijed određuje organizator ždrijebom.</p>
+              <p className="mt-2 text-[12px] text-brand-soft">* Momčadi su potpuno izjednačene. Redoslijed određuje organizator ždrijebom.</p>
             )}
           </section>
         );
@@ -108,7 +108,7 @@ const PLACED_PLURAL = ['', 'Prvoplasirani', 'Drugoplasirani', 'Trećeplasirani',
 function bracketBadge(bracket: string | undefined): string {
   if (bracket === undefined) return 'text-white/60';
   if (bracket === 'B') return 'bg-bloom-cyan text-pitch-950';
-  return 'bg-gold text-pitch-950';
+  return 'bg-brand text-white';
 }
 
 function hasB(advancing: Map<string, string>): boolean {
@@ -145,13 +145,13 @@ function CrossSection({ position, tables, advancing }: {
               const tie = cross.rows.filter((x) => x.crossRank === r.crossRank).length > 1;
               const goesTo = cross.complete && !tie ? advancing.get(`${position}#${r.crossRank}`) : undefined;
               return (
-                <tr key={r.teamId} className={`border-b border-line last:border-0 ${favorites.has(r.teamId) ? 'bg-gold/8' : ''}`}>
+                <tr key={r.teamId} className={`border-b border-line last:border-0 ${favorites.has(r.teamId) ? 'bg-brand/8' : ''}`}>
                   <td className="py-2 pl-3">
                     <span className={`grid size-6 place-items-center rounded-md text-[12px] font-extrabold ${bracketBadge(goesTo)}`}>{r.crossRank}</span>
                   </td>
                   <td className="py-2 pr-1">
                     <Link to={`${base}/momcad/${r.teamId}`} className="text-[13.5px] leading-tight font-bold">{teamName(snap, r.teamId)}</Link>
-                    {tie && cross.complete && <span className="text-gold"> *</span>}
+                    {tie && cross.complete && <span className="text-brand-soft"> *</span>}
                   </td>
                   <td className="text-center text-white/70">{r.groupName}</td>
                   <td className="text-center text-white/70">{r.goalDiff > 0 ? `+${r.goalDiff}` : r.goalDiff}</td>

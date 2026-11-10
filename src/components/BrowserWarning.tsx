@@ -20,7 +20,7 @@ export function BrowserWarning() {
       {ios ? (
         <p className="mt-2 text-[13px] text-white/65">Dodirni ⋯ ili ikonu kompasa i odaberi „Otvori u Safariju”.</p>
       ) : (
-        <a href={chromeIntentUrl()} className="mt-3 flex items-center justify-center rounded-xl bg-gold px-4 py-3 text-sm font-extrabold text-pitch-950">
+        <a href={chromeIntentUrl()} className="mt-3 flex items-center justify-center rounded-xl bg-brand px-4 py-3 text-sm font-extrabold text-white">
           Otvori u Chromeu
         </a>
       )}

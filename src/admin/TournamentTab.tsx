@@ -59,7 +59,7 @@ export function TournamentTab() {
 
       <SectionTitle>Logo</SectionTitle>
       <div className="flex items-center gap-4">
-        <img src={assetUrl(t.logo_path) ?? '/emblem.svg'} alt="" className="size-20 rounded-xl bg-white/5 object-contain p-2" />
+        <img src={assetUrl(t.logo_path) ?? '/logo.svg'} alt="" className="size-20 rounded-xl bg-white/5 object-contain p-2" />
         <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-white/8 px-4 text-sm font-extrabold ring-1 ring-white/12">
           <Icon name="upload" className="size-4" /> Promijeni logo
           <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
@@ -78,7 +78,7 @@ export function TournamentTab() {
         <div className="card divide-y divide-line">
           {t.tiebreakers.map((k, i) => (
             <div key={k} className="flex items-center gap-2 py-1.5 pl-3.5 pr-1.5">
-              <span className="w-5 text-[13px] font-black text-gold">{i + 1}.</span>
+              <span className="w-5 text-[13px] font-black text-brand-soft">{i + 1}.</span>
               <span className="flex-1 text-[14px] font-semibold">{TB_LABEL[k]}</span>
               <button type="button" disabled={i === 0} onClick={() => move(i, -1)} className="grid size-9 place-items-center rounded-lg disabled:opacity-20" aria-label="Gore"><Icon name="back" className="size-4 rotate-90" /></button>
               <button type="button" disabled={i === t.tiebreakers.length - 1} onClick={() => move(i, 1)} className="grid size-9 place-items-center rounded-lg disabled:opacity-20" aria-label="Dolje"><Icon name="back" className="size-4 -rotate-90" /></button>

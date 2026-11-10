@@ -44,7 +44,7 @@ export function NotificationsCard() {
   return (
     <div className="card p-4">
       <div className="flex items-center gap-2.5">
-        <Icon name={prefs.enabled ? 'bell' : 'bell-off'} className={`size-6 ${prefs.enabled ? 'text-gold' : 'text-white/50'}`} />
+        <Icon name={prefs.enabled ? 'bell' : 'bell-off'} className={`size-6 ${prefs.enabled ? 'text-brand-soft' : 'text-white/50'}`} />
         <div className="flex-1">
           <div className="font-extrabold">Obavijesti na mobitel</div>
           <div className="text-[12px] text-white/60">
@@ -60,7 +60,7 @@ export function NotificationsCard() {
       {support === 'install' && (
         <div className="mt-3 text-[13px] leading-relaxed text-white/75">
           Na iPhoneu obavijesti rade samo kad je aplikacija dodana na početni zaslon.
-          <Link to={guide} className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-gold px-4 py-3 text-sm font-extrabold text-pitch-950">
+          <Link to={guide} className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-3 text-sm font-extrabold text-white">
             Pokaži mi kako (video)
           </Link>
         </div>
@@ -69,7 +69,7 @@ export function NotificationsCard() {
       {support === 'unsupported' && (
         <p className="mt-3 text-[13px] leading-relaxed text-white/65">
           Ovaj preglednik ne podržava obavijesti. {isIos() ? 'Otvori stranicu u Safariju i dodaj je na početni zaslon.' : 'Otvori stranicu u Chromeu.'}{' '}
-          <Link to={guide} className="font-bold text-gold">Upute</Link>
+          <Link to={guide} className="font-bold text-brand-soft">Upute</Link>
         </p>
       )}
 
@@ -102,7 +102,7 @@ export function NotificationsCard() {
               <button key={c.label} type="button" disabled={busy} onClick={() => toggle(c.events)}
                 className="flex w-full items-center justify-between rounded-xl bg-white/6 px-3 py-2.5 text-left text-[14px] font-semibold">
                 {c.label}
-                <span className={`relative h-6 w-10 rounded-full transition ${on ? 'bg-gold' : 'bg-white/20'}`}>
+                <span className={`relative h-6 w-10 rounded-full transition ${on ? 'bg-brand' : 'bg-white/20'}`}>
                   <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
                 </span>
               </button>
@@ -116,7 +116,7 @@ export function NotificationsCard() {
 
       {msg && <p className="mt-3 text-[13px] text-[#ff8197]">{msg}</p>}
       {support !== 'install' && (
-        <Link to={guide} className="mt-3 block text-center text-[12px] font-bold text-gold">Kako to radi i video upute</Link>
+        <Link to={guide} className="mt-3 block text-center text-[12px] font-bold text-brand-soft">Kako to radi i video upute</Link>
       )}
     </div>
   );
@@ -129,7 +129,7 @@ export function NotifyBanner() {
   if (prefs.enabled || pushSupport() === 'demo' || pushSupport() === 'unsupported') return null;
   return (
     <Link to={`/t/${snap.tournament.slug}/obavijesti`} className="card mt-4 flex items-center gap-3 px-4 py-3">
-      <Icon name="bell" className="size-6 shrink-0 text-gold" />
+      <Icon name="bell" className="size-6 shrink-0 text-brand-soft" />
       <span className="flex-1 text-[14px] leading-snug">
         <b>Obavijest za svaki gol</b>
         <span className="block text-[12px] text-white/60">

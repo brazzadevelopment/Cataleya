@@ -25,7 +25,7 @@ export function MatchPage() {
     <div>
       <BackLink />
       <section className={`card relative overflow-hidden px-4 pb-5 pt-4 text-center ${m.status === 'live' ? 'bloom-border' : ''}`}>
-        <div className="text-[12px] font-extrabold tracking-[0.18em] text-gold uppercase">{matchPhase(snap, m)}</div>
+        <div className="text-[12px] font-extrabold tracking-[0.18em] text-brand-soft uppercase">{matchPhase(snap, m)}</div>
         <div className="mt-1 text-[13px] text-white/65">
           {day ? `${dayLabel(day)} · ${matchTime(snap, m)}` : 'Termin još nije poznat'}
         </div>
@@ -52,7 +52,7 @@ export function MatchPage() {
       <div className="card mt-3 divide-y divide-line text-[14px]">
         <Row icon="pin" label="Teren">
           {field ? (
-            field.maps_url ? <a href={field.maps_url} target="_blank" rel="noreferrer" className="font-bold text-gold underline-offset-2 hover:underline">{field.name} · karta</a> : <b>{field.name}</b>
+            field.maps_url ? <a href={field.maps_url} target="_blank" rel="noreferrer" className="font-bold text-brand-soft underline-offset-2 hover:underline">{field.name} · karta</a> : <b>{field.name}</b>
           ) : 'Još nije određen'}
         </Row>
         <Row icon="info" label="Mjesto"><b>{field?.venue ?? snap.tournament.place}</b></Row>
@@ -84,7 +84,7 @@ function Side({ label, teamId, winner }: { label: SideLabel; teamId: string | nu
   const inner = (
     <div className="flex flex-col items-center gap-2">
       {label.known ? <TeamBadge name={label.name} size="size-14" /> : <span className="size-14 rounded-full border-2 border-dashed border-white/25" />}
-      <span className={`text-[14px] leading-tight ${label.known ? 'font-extrabold' : 'italic text-white/55'} ${winner ? 'text-gold' : ''}`}>{label.name}</span>
+      <span className={`text-[14px] leading-tight ${label.known ? 'font-extrabold' : 'italic text-white/55'} ${winner ? 'text-brand-soft' : ''}`}>{label.name}</span>
       {label.provisional && (
         <span className="text-[13px] font-bold leading-tight">
           {label.provisional}

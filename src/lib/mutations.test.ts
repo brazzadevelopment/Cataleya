@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyToSnapshot, authorize, MutationError, type ScorePatch } from './mutations';
-import { clubNameOf, slugify } from './mutations';
+import { clubNameOf, slugify, youtubeId } from './mutations';
 import { demoSnapshot } from '../data/seed';
 
 const patch: ScorePatch = { home_score: 1, away_score: 0, home_penalties: null, away_penalties: null, status: 'live' };
@@ -99,5 +99,39 @@ describe('organizacija, novi turnir i klubovi', () => {
     expect(clubNameOf('NK Karlovac plavi 1919')).toBe('NK Karlovac 1919');
     expect(clubNameOf('NŠK Nova Zora')).toBe('NŠK Nova Zora');
     expect(slugify('Cataleya Cup · Zima 2027 (Višnjik)')).toBe('cataleya-cup-zima-2027-visnjik');
+  });
+});
+
+describe('sadržaj aplikacije (vijesti, sponzori, video…)', () => {
+  const owner = { role: 'owner' as const, fieldId: null };
+  it('uređuje samo organizacija, ne organizator turnira ni zapisničar', () => {
+    const m = { type: 'upsert' as const, table: 'news' as const, row: { id: 'n', title: 'Ždrijeb' } };
+    expect(() => authorize(m, owner)).not.toThrow();
+    expect(() => authorize(m, organizer)).toThrow(/PIN organizacije/);
+    expect(() => authorize(m, field1)).toThrow(MutationError);
+  });
+
+  it('provjerava sadržaj', () => {
+    expect(() => authorize({ type: 'upsert', table: 'news', row: { id: 'n', title: ' ' } }, owner)).toThrow(/naslov/);
+    expect(() => authorize({ type: 'upsert', table: 'videos', row: { id: 'v', title: 'Finale', youtube_id: 'krivo' } }, owner)).toThrow(/YouTube/);
+    expect(() => authorize({ type: 'upsert', table: 'sponsors', row: { id: 's', name: 'Firma', url: 'javascript:alert(1)' } }, owner)).toThrow(/https/);
+    expect(() => authorize({ type: 'delete', table: 'site_settings', id: 'about' }, owner)).toThrow(MutationError);
+  });
+
+  it('poruke s kontakt forme: organizacija smije samo označiti riješeno', () => {
+    const r = authorize({ type: 'upsert', table: 'contact_messages', row: { id: 'p', handled: true, message: 'promijenjeno' } }, owner);
+    expect(r).toEqual({ type: 'upsert', table: 'contact_messages', row: { id: 'p', handled: true } });
+  });
+
+  it('YouTube link u ID', () => {
+    expect(youtubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1')).toBe('dQw4w9WgXcQ');
+    expect(youtubeId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(youtubeId('https://www.youtube.com/live/dQw4w9WgXcQ?si=x')).toBe('dQw4w9WgXcQ');
+    expect(youtubeId('nije link')).toBeNull();
+  });
+
+  it('vrsta turnira samo Indoor, Proljeće ili Jesen', () => {
+    expect(() => authorize({ type: 'upsert', table: 'tournaments', row: { series: 'ljeto' } }, organizer)).toThrow(/vrsta/);
+    expect(authorize({ type: 'upsert', table: 'tournaments', row: { series: 'indoor' } }, organizer)).toMatchObject({ row: { series: 'indoor' } });
   });
 });

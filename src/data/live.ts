@@ -3,7 +3,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { MutationError, type Mutation } from '../lib/mutations';
-import type { Category, Club, Match, Session, Snapshot, Team, Tournament } from '../lib/types';
+import type { Category, Club, ContactMessage, GalleryItem, Match, NewsItem, Session, SiteContent, Snapshot, Sponsor, Team, Tournament, Video } from '../lib/types';
 import type { DataSource, LoginResult } from './source';
 
 const QUEUE_KEY = 'turnir.queue.v1';
@@ -30,7 +30,7 @@ function writeQueue(q: Queued[]): void {
 }
 
 interface Api {
-  post<T>(action: 'login' | 'mutate' | 'upload' | 'push-key' | 'subscribe' | 'unsubscribe', body: unknown, token?: string): Promise<T>;
+  post<T>(action: 'login' | 'mutate' | 'upload' | 'push-key' | 'subscribe' | 'unsubscribe' | 'contact' | 'messages', body: unknown, token?: string): Promise<T>;
 }
 
 function api(url: string, anonKey: string): Api {
@@ -216,6 +216,29 @@ export function createLiveSource(url: string, anonKey: string): DataSource {
       });
       const res = await post<{ path: string }>('upload', { name: file.name, type: file.type, data }, session.token);
       return res.path;
+    },
+    async content(): Promise<SiteContent> {
+      const [news, gallery, videos, sponsors, settings] = await Promise.all([
+        db.from('news').select('*').order('published_at', { ascending: false }).limit(100),
+        db.from('gallery').select('*').order('sort_order').order('created_at', { ascending: false }).limit(300),
+        db.from('videos').select('*').order('published_at', { ascending: false }).limit(50),
+        db.from('sponsors').select('*').order('sort_order').order('name'),
+        db.from('site_settings').select('key, value'),
+      ]);
+      for (const r of [news, gallery, videos, sponsors, settings]) if (r.error) throw r.error;
+      return {
+        news: news.data as NewsItem[],
+        gallery: gallery.data as GalleryItem[],
+        videos: videos.data as Video[],
+        sponsors: sponsors.data as Sponsor[],
+        settings: Object.fromEntries((settings.data as { key: string; value: string }[]).map((x) => [x.key, x.value])),
+      };
+    },
+    async sendContact(body) {
+      await post('contact', body);
+    },
+    async messages(session) {
+      return (await post<{ messages: ContactMessage[] }>('messages', {}, session.token)).messages;
     },
     push: {
       key: async () => (await post<{ key: string }>('push-key', {})).key,

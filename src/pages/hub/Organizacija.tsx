@@ -10,6 +10,10 @@ import { tournamentStatus } from '../../lib/hub';
 import { MutationError, slugify, type CopyOptions, type Mutation } from '../../lib/mutations';
 import { dateSpan } from '../../lib/time';
 import type { Club, Session, Tournament } from '../../lib/types';
+import { SERIES } from '../../lib/series';
+import { GalleryTab, MessagesTab, NewsTab, PagesTab, SponsorsTab, VideosTab } from './OrgContent';
+
+export const SERIES_OPTIONS: [string, string][] = [['', 'Bez kartice'], ...SERIES.map((x): [string, string] => [x.key, x.label])];
 
 /** Spremi prijavu i otvori pravo mjesto: organizacija, uređivanje turnira ili zapisnik. */
 export function rememberLogin(s: LoginResult): string {
@@ -106,7 +110,7 @@ function StatusLine({ status }: { status: { text: string; ok: boolean } | null }
 /** Organizacija Cataleya Cupa: svi turniri, novi turnir, klubovi, PIN-ovi organizacije. */
 export function Organizacija() {
   const org = useOrgSession();
-  const [tab, setTab] = useState<'turniri' | 'klubovi' | 'pin'>('turniri');
+  const [tab, setTab] = useState<'turniri' | 'klubovi' | 'pin' | 'vijesti' | 'galerija' | 'video' | 'sponzori' | 'stranice' | 'poruke'>('turniri');
   if (!org) return <GlobalLogin />;
 
   return (
@@ -120,11 +124,23 @@ export function Organizacija() {
       <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
         <Chip active={tab === 'turniri'} onClick={() => setTab('turniri')}>Turniri</Chip>
         <Chip active={tab === 'klubovi'} onClick={() => setTab('klubovi')}>Klubovi</Chip>
+        <Chip active={tab === 'vijesti'} onClick={() => setTab('vijesti')}>Vijesti</Chip>
+        <Chip active={tab === 'sponzori'} onClick={() => setTab('sponzori')}>Sponzori</Chip>
+        <Chip active={tab === 'galerija'} onClick={() => setTab('galerija')}>Galerija</Chip>
+        <Chip active={tab === 'video'} onClick={() => setTab('video')}>Video</Chip>
+        <Chip active={tab === 'stranice'} onClick={() => setTab('stranice')}>O nama i impresum</Chip>
+        <Chip active={tab === 'poruke'} onClick={() => setTab('poruke')}>Poruke</Chip>
         <Chip active={tab === 'pin'} onClick={() => setTab('pin')}>PIN organizacije</Chip>
       </div>
       {tab === 'turniri' && <TournamentsTab org={org} />}
       {tab === 'klubovi' && <ClubsTab org={org} />}
       {tab === 'pin' && <OrgPinTab org={org} />}
+      {tab === 'vijesti' && <NewsTab org={org} />}
+      {tab === 'sponzori' && <SponsorsTab org={org} />}
+      {tab === 'galerija' && <GalleryTab org={org} />}
+      {tab === 'video' && <VideosTab org={org} />}
+      {tab === 'stranice' && <PagesTab org={org} />}
+      {tab === 'poruke' && <MessagesTab org={org} />}
     </div>
   );
 }
@@ -177,6 +193,7 @@ function NewTournament({ org, list, onClose }: { org: Session; list: Tournament[
   const [slugTouched, setSlugTouched] = useState(false);
   const [place, setPlace] = useState(last?.place ?? 'Zadar');
   const [venue, setVenue] = useState(last?.venue ?? '');
+  const [series, setSeries] = useState<string>('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [copyFrom, setCopyFrom] = useState(last?.id ?? '');
@@ -185,7 +202,7 @@ function NewTournament({ org, list, onClose }: { org: Session; list: Tournament[
   async function create() {
     const r = await save([{
       type: 'createTournament',
-      row: { name, slug: slug || slugify(name), place: place || null, venue: venue || null, start_date: start, end_date: end || start },
+      row: { name, slug: slug || slugify(name), place: place || null, venue: venue || null, start_date: start, end_date: end || start, series: series || null },
       copyFrom: copyFrom || null,
       copy,
     }], 'Turnir je napravljen');
@@ -209,6 +226,7 @@ function NewTournament({ org, list, onClose }: { org: Session; list: Tournament[
           <Field label="Mjesto"><Input value={place} onChange={(e) => setPlace(e.target.value)} /></Field>
           <Field label="Lokacija"><Input value={venue} placeholder="npr. SC Višnjik" onChange={(e) => setVenue(e.target.value)} /></Field>
         </div>
+        <Field label="Kartica u izborniku" hint="Indoor, Proljeće ili Jesen: kartica dolje otvara ovaj turnir."><SelectBox value={series} onChange={(e) => setSeries(e.target.value)} options={SERIES_OPTIONS} /></Field>
         <Field label="Kopiraj iz turnira" hint="Pravila i kriteriji se uvijek kopiraju. Raspored se ubacuje iz Excela u uređivanju turnira.">
           <SelectBox value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} options={[['', 'Ništa, prazan turnir'], ...list.map((t) => [t.id, t.name] as [string, string])]} />
         </Field>

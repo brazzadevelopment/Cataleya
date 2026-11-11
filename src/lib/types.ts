@@ -43,7 +43,11 @@ export interface Tournament {
   is_published: boolean;
   /** Turnir je zaključen: PIN-ovi terena više ne vrijede, ide u arhivu. */
   closed_at?: string | null;
+  /** Kartica u donjem izborniku: Indoor, Proljeće ili Jesen. */
+  series?: SeriesKey | null;
 }
+
+export type SeriesKey = 'indoor' | 'proljece' | 'jesen';
 
 /** Klub kroz sve turnire; momčad pripada klubu. */
 export interface Club {
@@ -153,4 +157,64 @@ export interface Session {
   role: Role;
   fieldId: string | null;
   token: string;
+}
+
+// Sadržaj aplikacije (supabase/migrations/003_cataleya_sadrzaj.sql) -----------
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  summary: string | null;
+  body: string | null;
+  image_path: string | null;
+  published_at: string;
+  is_published: boolean;
+}
+
+export interface GalleryItem {
+  id: string;
+  image_path: string;
+  caption: string | null;
+  tournament_id: string | null;
+  sort_order: number;
+  created_at?: string;
+}
+
+export interface Video {
+  id: string;
+  title: string;
+  youtube_id: string;
+  is_live: boolean;
+  published_at: string;
+}
+
+export type SponsorTier = 'glavni' | 'zlatni' | 'partner';
+
+export interface Sponsor {
+  id: string;
+  name: string;
+  logo_path: string | null;
+  url: string | null;
+  tier: SponsorTier;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  message: string;
+  handled: boolean;
+  created_at: string;
+}
+
+/** Sve što javne stranice trebaju osim turnira. */
+export interface SiteContent {
+  news: NewsItem[];
+  gallery: GalleryItem[];
+  videos: Video[];
+  sponsors: Sponsor[];
+  settings: Record<string, string>;
 }

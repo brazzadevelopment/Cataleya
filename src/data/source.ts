@@ -1,5 +1,5 @@
 import type { Mutation } from '../lib/mutations';
-import type { Category, Club, Match, Session, Snapshot, Team, Tournament } from '../lib/types';
+import type { Category, Club, ContactMessage, Match, Session, SiteContent, Snapshot, Team, Tournament } from '../lib/types';
 import { createDemoSource } from './demo';
 import { createLiveSource } from './live';
 
@@ -18,6 +18,16 @@ export interface HallOfFame {
   teams: Team[];
   tournaments: Tournament[];
   categories: Category[];
+}
+
+export interface ContactForm {
+  name: string;
+  email: string;
+  phone: string;
+  message: string;
+  consent: boolean;
+  /** Skriveno polje: ljudi ga ne vide, roboti ga ispune. */
+  website: string;
 }
 
 /** Rezultat prijave: turnir (i njegova adresa) ili organizacija (role 'owner'). */
@@ -40,6 +50,12 @@ export interface DataSource {
   /** Vraća što je server stvorio (npr. novi turnir). */
   mutate(session: Session, mutations: Mutation[]): Promise<{ created?: { id: string; slug: string } }>;
   uploadImage(session: Session, file: File): Promise<string>;
+  /** Vijesti, galerija, video, sponzori i tekstovi stranica. */
+  content(): Promise<SiteContent>;
+  /** Kontakt forma (bez prijave). */
+  sendContact(body: ContactForm): Promise<void>;
+  /** Poruke s kontakt forme (samo organizacija). */
+  messages(session: Session): Promise<ContactMessage[]>;
   /** Obavijesti na mobitel; samo pravi način (demo ih nema). */
   push?: {
     key(): Promise<string>;

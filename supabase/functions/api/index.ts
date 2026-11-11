@@ -1,4 +1,4 @@
-// Supabase Edge Function: /functions/v1/api/{login|mutate|upload|subscribe|unsubscribe}
+// Supabase Edge Function: /functions/v1/api/{login|mutate|upload|subscribe|unsubscribe|contact|messages}
 // SUPABASE_URL i SUPABASE_SERVICE_ROLE_KEY Supabase daje sam.
 // Tajna za potpisivanje prijave je u tablici app_secrets (vidi schema.sql).
 // Obavijesti: ključ za potpis (VAPID) server napravi sam pri prvoj upotrebi
@@ -8,7 +8,7 @@
 // core.js nastaje iz server/core.ts naredbom `npm run build:edge`.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { login, mutate, notify, rawPublicKey, b64urlEncode, subscribe, unsubscribe, upload, type ServiceAccount, type VapidKeys } from './core.js';
+import { contact, login, messages, mutate, notify, rawPublicKey, b64urlEncode, subscribe, unsubscribe, upload, type ServiceAccount, type VapidKeys } from './core.js';
 
 interface Reply {
   status: number;
@@ -88,6 +88,11 @@ Deno.serve(async (req) => {
     if (action === 'push-key') return json({ status: 200, body: { key: b64urlEncode(rawPublicKey((await vapidKeys()).privateJwk)) } });
     if (action === 'subscribe') return json(await subscribe(db, body));
     if (action === 'unsubscribe') return json(await unsubscribe(db, body));
+    if (action === 'contact') {
+      const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim();
+      return json(await contact(db, body, ip));
+    }
+    if (action === 'messages') return json(await messages(db, s, token));
     if (action === 'upload') return json(await upload(db, s, token, body));
     return json({ status: 404, body: { error: 'Nepoznata radnja.' } });
   } catch (e) {

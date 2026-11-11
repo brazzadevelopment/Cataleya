@@ -5,7 +5,16 @@
 import { computeAdvancement, type TeamAssignment } from './advancement.js';
 import type { Match, MatchStatus, Role, Snapshot } from './types.js';
 
-export type TableName = 'tournaments' | 'categories' | 'fields' | 'teams' | 'groups' | 'group_teams' | 'matches' | 'clubs';
+export type TableName = 'tournaments' | 'categories' | 'fields' | 'teams' | 'groups' | 'group_teams' | 'matches' | 'clubs'
+  | ContentTable;
+
+/** Sadržaj aplikacije (ne pripada turniru): uređuje samo organizacija. */
+export type ContentTable = 'news' | 'gallery' | 'videos' | 'sponsors' | 'site_settings' | 'contact_messages';
+export const CONTENT_TABLES = new Set<string>(['news', 'gallery', 'videos', 'sponsors', 'site_settings', 'contact_messages']);
+/** Tablice izvan turnira (klubovi i sadržaj). */
+export function isOrgTable(t: unknown): boolean {
+  return t === 'clubs' || (typeof t === 'string' && CONTENT_TABLES.has(t));
+}
 
 /** Što se kopira iz prethodnog turnira u novi. */
 export interface CopyOptions {
@@ -21,7 +30,10 @@ export interface NewTournament {
   venue?: string | null;
   start_date: string;
   end_date: string;
+  series?: string | null;
 }
+
+export const SERIES_KEYS = ['indoor', 'proljece', 'jesen'] as const;
 
 export interface ScorePatch {
   home_score: number | null;
@@ -56,7 +68,7 @@ export interface Actor {
 const EDITABLE: Record<TableName, string[]> = {
   tournaments: ['name', 'place', 'venue', 'start_date', 'end_date', 'logo_path', 'cover_path', 'color_primary',
     'color_secondary', 'description', 'rules', 'points_win', 'points_draw', 'points_loss', 'tiebreakers',
-    'scorers_enabled', 'is_published'],
+    'scorers_enabled', 'is_published', 'series'],
   categories: ['id', 'name', 'birth_year', 'match_minutes', 'players_on_field', 'sort_order'],
   fields: ['id', 'name', 'venue', 'maps_url', 'sort_order'],
   teams: ['id', 'category_id', 'name', 'short_name', 'logo_path', 'club_id'],
@@ -67,7 +79,52 @@ const EDITABLE: Record<TableName, string[]> = {
     'home_penalties', 'away_penalties', 'status', 'home_yellow', 'away_yellow', 'home_red', 'away_red', 'bracket',
     'winner_place', 'loser_place', 'teams_locked'],
   clubs: ['id', 'name', 'short_name', 'city', 'logo_path'],
+  news: ['id', 'title', 'summary', 'body', 'image_path', 'published_at', 'is_published'],
+  gallery: ['id', 'image_path', 'caption', 'tournament_id', 'sort_order'],
+  videos: ['id', 'title', 'youtube_id', 'is_live', 'published_at'],
+  sponsors: ['id', 'name', 'logo_path', 'url', 'tier', 'sort_order', 'is_active'],
+  site_settings: ['key', 'value'],
+  contact_messages: ['id', 'handled'],
 };
+
+/** Provjera sadržaja prije spremanja (isto u demu i na serveru). */
+export function validateContent(table: ContentTable, row: Record<string, unknown>): void {
+  const text = (k: string, max: number, label: string) => {
+    const v = row[k];
+    if (v === undefined || v === null) return;
+    if (typeof v !== 'string' || v.length > max) throw new MutationError(`${label} je predugačak.`);
+  };
+  const need = (k: string, label: string) => {
+    if (typeof row[k] !== 'string' || !(row[k] as string).trim()) throw new MutationError(`Upiši ${label}.`);
+  };
+  if (table === 'news') {
+    need('title', 'naslov'); text('title', 200, 'Naslov'); text('summary', 500, 'Sažetak'); text('body', 20000, 'Tekst');
+  } else if (table === 'gallery') {
+    need('image_path', 'sliku'); text('caption', 300, 'Opis');
+  } else if (table === 'videos') {
+    need('title', 'naslov videa'); text('title', 200, 'Naslov');
+    if (typeof row.youtube_id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(row.youtube_id)) throw new MutationError('Zalijepi ispravan YouTube link.');
+  } else if (table === 'sponsors') {
+    need('name', 'naziv sponzora'); text('name', 120, 'Naziv');
+    if (row.url != null && row.url !== '' && (typeof row.url !== 'string' || !/^https?:\/\/\S+$/.test(row.url))) throw new MutationError('Web adresa mora početi s https://');
+    if (row.url === '') row.url = null;
+    if (row.tier !== undefined && !['glavni', 'zlatni', 'partner'].includes(row.tier as string)) throw new MutationError('Nepoznata vrsta sponzora.');
+  } else if (table === 'site_settings') {
+    if (typeof row.key !== 'string' || !/^[a-z_]{1,40}$/.test(row.key)) throw new MutationError('Nepoznata postavka.');
+    text('value', 20000, 'Tekst');
+    if (typeof row.value !== 'string') row.value = '';
+  } else if (table === 'contact_messages') {
+    if (typeof row.handled !== 'boolean') throw new MutationError('Neispravan zahtjev.');
+  }
+}
+
+/** YouTube ID iz linka (watch, youtu.be, live, shorts, embed) ili samog ID-ja. */
+export function youtubeId(input: string): string | null {
+  const s = input.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtu\.be\/|[?&]v=|\/(?:live|shorts|embed)\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -139,8 +196,9 @@ export function authorize(m: Mutation, actor: Actor, match?: Pick<Match, 'field_
   if (ORG_MUTATIONS.has(m.type) && actor.role !== 'owner') throw new MutationError('Za ovo treba PIN organizacije.', 403);
   if (m.type === 'createTournament') {
     validateNewTournament(m.row);
-    const { name, slug, place = null, venue = null, start_date, end_date } = m.row;
-    return { ...m, row: { name: name.trim(), slug, place, venue, start_date, end_date } };
+    const { name, slug, place = null, venue = null, start_date, end_date, series = null } = m.row;
+    if (series !== null && !(SERIES_KEYS as readonly string[]).includes(series)) throw new MutationError('Nepoznata vrsta turnira.');
+    return { ...m, row: { name: name.trim(), slug, place, venue, start_date, end_date, series } };
   }
   if (m.type === 'setOrgPin') {
     if (!/^[0-9]{4,8}$/.test(m.pin)) throw new MutationError('PIN mora imati 4 do 8 znamenki.');
@@ -153,7 +211,9 @@ export function authorize(m: Mutation, actor: Actor, match?: Pick<Match, 'field_
     return m;
   }
   if (!(m.table in EDITABLE)) throw new MutationError('Nepoznata tablica.');
+  if (CONTENT_TABLES.has(m.table) && actor.role !== 'owner') throw new MutationError('Za ovo treba PIN organizacije.', 403);
   if (m.type === 'delete') {
+    if (m.table === 'site_settings') throw new MutationError('Postavka se ne briše, samo se isprazni.');
     if (m.table === 'tournaments') throw new MutationError('Turnir se ne briše iz aplikacije.', 403);
     if (m.table === 'clubs' && actor.role !== 'owner') throw new MutationError('Klub briše samo organizacija.', 403);
     return m;
@@ -161,6 +221,10 @@ export function authorize(m: Mutation, actor: Actor, match?: Pick<Match, 'field_
   const allowed = EDITABLE[m.table];
   const row: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(m.row)) if (allowed.includes(k)) row[k] = v;
+  if (CONTENT_TABLES.has(m.table)) validateContent(m.table as ContentTable, row);
+  if (m.table === 'tournaments' && row.series !== undefined && row.series !== null && !(SERIES_KEYS as readonly string[]).includes(row.series as string)) {
+    throw new MutationError('Nepoznata vrsta turnira.');
+  }
   if (m.table === 'matches' && row.status === 'finished' && row.home_score == null) {
     throw new MutationError('Završena utakmica mora imati rezultat.');
   }
@@ -174,7 +238,7 @@ export function affectedCategories(m: Mutation, s: Snapshot): string[] {
     return match ? [match.category_id] : [];
   }
   if (m.type !== 'upsert' && m.type !== 'delete') return [];
-  if (m.table === 'clubs') return [];
+  if (isOrgTable(m.table)) return [];
   if (m.table === 'tournaments') return s.categories.map((c) => c.id);
   if (m.table === 'matches' || m.table === 'group_teams') {
     const fromRow = m.type === 'upsert' ? (m.row.category_id as string | undefined) : undefined;
@@ -202,7 +266,7 @@ export function advancementFor(s: Snapshot, categoryId: string): TeamAssignment[
 // Primjena na snimku podataka (demo način)
 // ---------------------------------------------------------------------
 
-const KEY: Record<TableName, keyof Snapshot> = {
+const KEY: Record<Exclude<TableName, ContentTable>, keyof Snapshot> = {
   tournaments: 'tournament', categories: 'categories', fields: 'fields', teams: 'teams',
   groups: 'groups', group_teams: 'groupTeams', matches: 'matches', clubs: 'clubs',
 };
@@ -224,8 +288,11 @@ export function applyToSnapshot(s: Snapshot, m: Mutation): Snapshot {
     if (match) Object.assign(match, m.patch);
   } else if (m.table === 'tournaments') {
     if (m.type === 'upsert') Object.assign(next.tournament, m.row);
+  } else if (CONTENT_TABLES.has(m.table)) {
+    // Sadržaj nije dio turnira; demo ga drži zasebno (data/demo.ts).
+    return next;
   } else {
-    const list = next[KEY[m.table]] as unknown as Record<string, unknown>[];
+    const list = next[KEY[m.table as Exclude<TableName, ContentTable>]] as unknown as Record<string, unknown>[];
     if (m.type === 'delete') {
       const i = list.findIndex((r) => rowKey(m.table, r) === m.id);
       if (i >= 0) list.splice(i, 1);

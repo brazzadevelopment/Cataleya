@@ -40,3 +40,17 @@ describe('pobjednici i klub', () => {
     expect(clubRecord([final, third], [{ id: 'a' }, { id: 'c' }])).toEqual({ played: 2, won: 1, drawn: 0, lost: 1, goalsFor: 3, goalsAgainst: 1 });
   });
 });
+
+describe('kartica turnira (Indoor, Proljeće, Jesen)', () => {
+  const t = (id: string, start: string, end: string, series: 'indoor' | 'jesen' = 'indoor') =>
+    ({ id, series, start_date: start, end_date: end, closed_at: null }) as unknown as import('./types').Tournament;
+  it('otvara turnir u tijeku, inače sljedeći, inače zadnji', async () => {
+    const { currentEdition } = await import('./series');
+    const list = [t('a', '2026-01-10', '2026-01-11'), t('b', '2027-01-16', '2027-01-17'), t('c', '2028-01-15', '2028-01-16'), t('j', '2026-10-23', '2026-10-25', 'jesen')];
+    expect(currentEdition(list, 'indoor', '2026-11-11')?.id).toBe('b');
+    expect(currentEdition(list, 'indoor', '2027-01-16')?.id).toBe('b');
+    expect(currentEdition(list, 'indoor', '2029-01-01')?.id).toBe('c');
+    expect(currentEdition(list, 'jesen', '2026-11-11')?.id).toBe('j');
+    expect(currentEdition(list, 'proljece' as never, '2026-11-11')).toBeNull();
+  });
+});

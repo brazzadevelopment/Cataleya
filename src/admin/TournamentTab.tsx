@@ -3,7 +3,8 @@ import { Button, Icon, SectionTitle } from '../components/ui';
 import { assetUrl, source } from '../data/source';
 import { useTournament } from '../data/TournamentContext';
 import type { Tiebreaker, Tournament } from '../lib/types';
-import { Field, Input, Status, TextArea, useSave } from './kit';
+import { Field, Input, SelectBox, Status, TextArea, useSave } from './kit';
+import { SERIES } from '../lib/series';
 
 const TB_LABEL: Record<Tiebreaker, string> = {
   head_to_head: 'Međusobni susret',
@@ -52,6 +53,9 @@ export function TournamentTab() {
       <div className="grid grid-cols-2 gap-3">
         <Field label="Mjesto"><Input value={t.place ?? ''} onChange={(e) => set('place', e.target.value || null)} /></Field>
         <Field label="Teren / podloga"><Input value={t.venue ?? ''} onChange={(e) => set('venue', e.target.value || null)} /></Field>
+        <Field label="Kartica u izborniku" hint="Indoor, Proljeće ili Jesen: kartica dolje otvara ovaj turnir.">
+          <SelectBox value={t.series ?? ''} onChange={(e) => set('series', (e.target.value || null) as Tournament['series'])} options={[['', 'Bez kartice'], ...SERIES.map((x): [string, string] => [x.key, x.label])]} />
+        </Field>
         <Field label="Od"><Input type="date" value={t.start_date} onChange={(e) => set('start_date', e.target.value)} required /></Field>
         <Field label="Do"><Input type="date" value={t.end_date} onChange={(e) => set('end_date', e.target.value)} required /></Field>
       </div>

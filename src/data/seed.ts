@@ -61,6 +61,7 @@ const tournament: Tournament = {
   tiebreakers: ['head_to_head', 'goal_difference', 'goals_for', 'fewer_goals_against', 'fewer_cards', 'lot'],
   scorers_enabled: false,
   is_published: true,
+  series: 'jesen',
 };
 
 // ---------------------------------------------------------------------

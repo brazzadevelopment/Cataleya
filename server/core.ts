@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeAdvancement } from '../src/lib/advancement.js';
-import { authorize, MutationError, ORG_MUTATIONS, type CopyOptions, type Mutation, type NewTournament, type TableName } from '../src/lib/mutations.js';
+import { authorize, CONTENT_TABLES, isOrgTable, MutationError, ORG_MUTATIONS, type CopyOptions, type Mutation, type NewTournament, type TableName } from '../src/lib/mutations.js';
 import type { Group, GroupTeam, Match, Role, Tournament } from '../src/lib/types.js';
 import { checkSubscribe, FCM_PREFIX, type MatchChange, type SubscribeBody } from './notify.js';
 
@@ -133,7 +133,7 @@ export async function mutate(db: SupabaseClient, secret: string, token: string |
   // Organizacija radi u turniru koji je odabrala.
   let s = session;
   if (session.r === 'owner') {
-    const needsTournament = mutations.some((m) => !ORG_MUTATIONS.has(m?.type) && !(m?.type !== 'score' && 'table' in m && m.table === 'clubs'));
+    const needsTournament = mutations.some((m) => !ORG_MUTATIONS.has(m?.type) && !(m?.type !== 'score' && 'table' in m && isOrgTable(m.table)));
     if (needsTournament) {
       if (!isUuid(tournamentId)) return fail(400, 'Odaberi turnir.');
       const { data } = await db.from('tournaments').select('id').eq('id', tournamentId).maybeSingle();
@@ -273,6 +273,11 @@ async function apply(db: SupabaseClient, s: TokenData, raw: Mutation, changes: M
     return [];
   }
 
+  if ((m.type === 'upsert' || m.type === 'delete') && CONTENT_TABLES.has(m.table)) {
+    await applyContent(db, m);
+    return [];
+  }
+
   if (m.type === 'setPin') {
     if (m.fieldId) await ensureOwn(db, 'fields', 'id', m.fieldId, s.t);
     const { error } = await db.rpc('set_pin', { p_tournament_id: s.t, p_field_id: m.fieldId, p_pin: m.pin });
@@ -334,6 +339,7 @@ async function createTournament(db: SupabaseClient, row: NewTournament, copyFrom
   }
   const { data: created, error } = await db.from('tournaments').insert({
     ...row,
+    series: row.series ?? base.series ?? null,
     timezone: base.timezone ?? 'Europe/Zagreb',
     logo_path: base.logo_path ?? null,
     color_primary: base.color_primary ?? '#019c61',
@@ -384,6 +390,73 @@ async function createTournament(db: SupabaseClient, row: NewTournament, copyFrom
     }
   }
   return t;
+}
+
+/** Vijesti, galerija, video, sponzori, tekstovi stranica, poruke (samo organizacija). */
+async function applyContent(db: SupabaseClient, m: Extract<Mutation, { type: 'upsert' | 'delete' }>) {
+  if (m.type === 'delete') {
+    if (!isUuid(m.id)) throw new MutationError('Nedostaje oznaka zapisa.');
+    const { error } = await db.from(m.table).delete().eq('id', m.id);
+    if (error) throw error;
+    return;
+  }
+  if (m.table === 'site_settings') {
+    const { error } = await db.from('site_settings').upsert({ ...m.row, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if (error) throw error;
+    return;
+  }
+  if (!isUuid(m.row.id)) throw new MutationError('Nedostaje oznaka zapisa.');
+  if (m.table === 'contact_messages') {
+    const { error } = await db.from('contact_messages').update({ handled: m.row.handled }).eq('id', m.row.id);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await db.from(m.table).upsert(m.row, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------
+// POST contact { name, email, phone?, message, website (zamka za robote) }
+// POST messages (PIN organizacije) → poruke s kontakt forme
+// ---------------------------------------------------------------------
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const recent = new Map<string, number[]>();
+
+export async function contact(db: SupabaseClient, body: unknown, ip = ''): Promise<Reply> {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const str = (k: string) => (typeof b[k] === 'string' ? (b[k] as string).trim() : '');
+  // Robot je ispunio skriveno polje: tiho „uspije”, ništa se ne sprema.
+  if (str('website')) return { status: 200, body: { ok: true } };
+  const name = str('name'), email = str('email'), phone = str('phone'), message = str('message');
+  if (!name || name.length > 120) return fail(400, 'Upiši ime i prezime.');
+  if (!EMAIL.test(email) || email.length > 200) return fail(400, 'Upiši ispravnu e-mail adresu.');
+  if (phone.length > 40) return fail(400, 'Broj telefona je predugačak.');
+  if (message.length < 5 || message.length > 4000) return fail(400, 'Napiši poruku (najviše 4000 znakova).');
+  if (b.consent !== true) return fail(400, 'Potvrdi da smijemo spremiti tvoje podatke radi odgovora.');
+  const now = Date.now();
+  const list = (recent.get(ip) ?? []).filter((t) => now - t < 10 * 60000);
+  if (list.length >= 5) return fail(429, 'Poslano je previše poruka. Pokušaj ponovno za nekoliko minuta.');
+  recent.set(ip, [...list, now]);
+  const { error } = await db.from('contact_messages').insert({ name, email, phone: phone || null, message });
+  if (error) {
+    console.error(error);
+    return fail(500, 'Poruka nije poslana. Pokušaj ponovno.');
+  }
+  return { status: 200, body: { ok: true } };
+}
+
+export async function messages(db: SupabaseClient, secret: string, token: string | null): Promise<Reply> {
+  const s = verifyToken(secret, token);
+  if (!s) return fail(401, 'Prijava je istekla. Upiši PIN ponovno.');
+  if (s.r !== 'owner') return fail(403, 'Za ovo treba PIN organizacije.');
+  if (!(await pinStillValid(db, s))) return fail(401, 'PIN je promijenjen. Upiši novi PIN.');
+  const { data, error } = await db.from('contact_messages').select('*').order('created_at', { ascending: false }).limit(300);
+  if (error) {
+    console.error(error);
+    return fail(500, 'Poruke se ne mogu učitati.');
+  }
+  return { status: 200, body: { messages: data } };
 }
 
 async function ensureOwn(db: SupabaseClient, table: string, key: string, id: string, tournamentId: string) {

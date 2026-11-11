@@ -97,3 +97,14 @@
     background: white !important;
   }
 }
+
+/* Sponzori koji se vrte (traka na početnoj i u turniru). */
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+@utility animate-marquee {
+  animation: marquee var(--marquee-duration, 30s) linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

@@ -242,6 +242,11 @@ function computeAdvancement(data) {
 }
 
 // src/lib/mutations.ts
+var CONTENT_TABLES = /* @__PURE__ */ new Set(["news", "gallery", "videos", "sponsors", "site_settings", "contact_messages"]);
+function isOrgTable(t) {
+  return t === "clubs" || typeof t === "string" && CONTENT_TABLES.has(t);
+}
+var SERIES_KEYS = ["indoor", "proljece", "jesen"];
 var ORG_MUTATIONS = /* @__PURE__ */ new Set(["createTournament", "setOrgPin"]);
 var EDITABLE = {
   tournaments: [
@@ -261,7 +266,8 @@ var EDITABLE = {
     "points_loss",
     "tiebreakers",
     "scorers_enabled",
-    "is_published"
+    "is_published",
+    "series"
   ],
   categories: ["id", "name", "birth_year", "match_minutes", "players_on_field", "sort_order"],
   fields: ["id", "name", "venue", "maps_url", "sort_order"],
@@ -296,8 +302,49 @@ var EDITABLE = {
     "loser_place",
     "teams_locked"
   ],
-  clubs: ["id", "name", "short_name", "city", "logo_path"]
+  clubs: ["id", "name", "short_name", "city", "logo_path"],
+  news: ["id", "title", "summary", "body", "image_path", "published_at", "is_published"],
+  gallery: ["id", "image_path", "caption", "tournament_id", "sort_order"],
+  videos: ["id", "title", "youtube_id", "is_live", "published_at"],
+  sponsors: ["id", "name", "logo_path", "url", "tier", "sort_order", "is_active"],
+  site_settings: ["key", "value"],
+  contact_messages: ["id", "handled"]
 };
+function validateContent(table, row) {
+  const text = (k, max, label) => {
+    const v = row[k];
+    if (v === void 0 || v === null) return;
+    if (typeof v !== "string" || v.length > max) throw new MutationError(`${label} je preduga\u010Dak.`);
+  };
+  const need = (k, label) => {
+    if (typeof row[k] !== "string" || !row[k].trim()) throw new MutationError(`Upi\u0161i ${label}.`);
+  };
+  if (table === "news") {
+    need("title", "naslov");
+    text("title", 200, "Naslov");
+    text("summary", 500, "Sa\u017Eetak");
+    text("body", 2e4, "Tekst");
+  } else if (table === "gallery") {
+    need("image_path", "sliku");
+    text("caption", 300, "Opis");
+  } else if (table === "videos") {
+    need("title", "naslov videa");
+    text("title", 200, "Naslov");
+    if (typeof row.youtube_id !== "string" || !/^[A-Za-z0-9_-]{11}$/.test(row.youtube_id)) throw new MutationError("Zalijepi ispravan YouTube link.");
+  } else if (table === "sponsors") {
+    need("name", "naziv sponzora");
+    text("name", 120, "Naziv");
+    if (row.url != null && row.url !== "" && (typeof row.url !== "string" || !/^https?:\/\/\S+$/.test(row.url))) throw new MutationError("Web adresa mora po\u010Deti s https://");
+    if (row.url === "") row.url = null;
+    if (row.tier !== void 0 && !["glavni", "zlatni", "partner"].includes(row.tier)) throw new MutationError("Nepoznata vrsta sponzora.");
+  } else if (table === "site_settings") {
+    if (typeof row.key !== "string" || !/^[a-z_]{1,40}$/.test(row.key)) throw new MutationError("Nepoznata postavka.");
+    text("value", 2e4, "Tekst");
+    if (typeof row.value !== "string") row.value = "";
+  } else if (table === "contact_messages") {
+    if (typeof row.handled !== "boolean") throw new MutationError("Neispravan zahtjev.");
+  }
+}
 var SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 var DATE = /^\d{4}-\d{2}-\d{2}$/;
 function validateNewTournament(r) {
@@ -344,8 +391,9 @@ function authorize(m, actor, match) {
   if (ORG_MUTATIONS.has(m.type) && actor.role !== "owner") throw new MutationError("Za ovo treba PIN organizacije.", 403);
   if (m.type === "createTournament") {
     validateNewTournament(m.row);
-    const { name, slug, place = null, venue = null, start_date, end_date } = m.row;
-    return { ...m, row: { name: name.trim(), slug, place, venue, start_date, end_date } };
+    const { name, slug, place = null, venue = null, start_date, end_date, series = null } = m.row;
+    if (series !== null && !SERIES_KEYS.includes(series)) throw new MutationError("Nepoznata vrsta turnira.");
+    return { ...m, row: { name: name.trim(), slug, place, venue, start_date, end_date, series } };
   }
   if (m.type === "setOrgPin") {
     if (!/^[0-9]{4,8}$/.test(m.pin)) throw new MutationError("PIN mora imati 4 do 8 znamenki.");
@@ -358,7 +406,9 @@ function authorize(m, actor, match) {
     return m;
   }
   if (!(m.table in EDITABLE)) throw new MutationError("Nepoznata tablica.");
+  if (CONTENT_TABLES.has(m.table) && actor.role !== "owner") throw new MutationError("Za ovo treba PIN organizacije.", 403);
   if (m.type === "delete") {
+    if (m.table === "site_settings") throw new MutationError("Postavka se ne bri\u0161e, samo se isprazni.");
     if (m.table === "tournaments") throw new MutationError("Turnir se ne bri\u0161e iz aplikacije.", 403);
     if (m.table === "clubs" && actor.role !== "owner") throw new MutationError("Klub bri\u0161e samo organizacija.", 403);
     return m;
@@ -366,6 +416,10 @@ function authorize(m, actor, match) {
   const allowed = EDITABLE[m.table];
   const row = {};
   for (const [k, v] of Object.entries(m.row)) if (allowed.includes(k)) row[k] = v;
+  if (CONTENT_TABLES.has(m.table)) validateContent(m.table, row);
+  if (m.table === "tournaments" && row.series !== void 0 && row.series !== null && !SERIES_KEYS.includes(row.series)) {
+    throw new MutationError("Nepoznata vrsta turnira.");
+  }
   if (m.table === "matches" && row.status === "finished" && row.home_score == null) {
     throw new MutationError("Zavr\u0161ena utakmica mora imati rezultat.");
   }
@@ -730,7 +784,7 @@ async function mutate(db, secret, token, body) {
   if (!await pinStillValid(db, session)) return fail(401, "PIN je promijenjen. Upi\u0161i novi PIN.");
   let s = session;
   if (session.r === "owner") {
-    const needsTournament = mutations.some((m) => !ORG_MUTATIONS.has(m?.type) && !(m?.type !== "score" && "table" in m && m.table === "clubs"));
+    const needsTournament = mutations.some((m) => !ORG_MUTATIONS.has(m?.type) && !(m?.type !== "score" && "table" in m && isOrgTable(m.table)));
     if (needsTournament) {
       if (!isUuid(tournamentId)) return fail(400, "Odaberi turnir.");
       const { data } = await db.from("tournaments").select("id").eq("id", tournamentId).maybeSingle();
@@ -845,6 +899,10 @@ async function apply(db, s, raw, changes, out) {
     if (error2) throw error2;
     return [];
   }
+  if ((m.type === "upsert" || m.type === "delete") && CONTENT_TABLES.has(m.table)) {
+    await applyContent(db, m);
+    return [];
+  }
   if (m.type === "setPin") {
     if (m.fieldId) await ensureOwn(db, "fields", "id", m.fieldId, s.t);
     const { error: error2 } = await db.rpc("set_pin", { p_tournament_id: s.t, p_field_id: m.fieldId, p_pin: m.pin });
@@ -898,6 +956,7 @@ async function createTournament(db, row, copyFrom, copy) {
   }
   const { data: created, error } = await db.from("tournaments").insert({
     ...row,
+    series: row.series ?? base.series ?? null,
     timezone: base.timezone ?? "Europe/Zagreb",
     logo_path: base.logo_path ?? null,
     color_primary: base.color_primary ?? "#019c61",
@@ -945,6 +1004,62 @@ async function createTournament(db, row, copyFrom, copy) {
   }
   return t;
 }
+async function applyContent(db, m) {
+  if (m.type === "delete") {
+    if (!isUuid(m.id)) throw new MutationError("Nedostaje oznaka zapisa.");
+    const { error: error2 } = await db.from(m.table).delete().eq("id", m.id);
+    if (error2) throw error2;
+    return;
+  }
+  if (m.table === "site_settings") {
+    const { error: error2 } = await db.from("site_settings").upsert({ ...m.row, updated_at: (/* @__PURE__ */ new Date()).toISOString() }, { onConflict: "key" });
+    if (error2) throw error2;
+    return;
+  }
+  if (!isUuid(m.row.id)) throw new MutationError("Nedostaje oznaka zapisa.");
+  if (m.table === "contact_messages") {
+    const { error: error2 } = await db.from("contact_messages").update({ handled: m.row.handled }).eq("id", m.row.id);
+    if (error2) throw error2;
+    return;
+  }
+  const { error } = await db.from(m.table).upsert(m.row, { onConflict: "id" });
+  if (error) throw error;
+}
+var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var recent = /* @__PURE__ */ new Map();
+async function contact(db, body, ip = "") {
+  const b = body ?? {};
+  const str = (k) => typeof b[k] === "string" ? b[k].trim() : "";
+  if (str("website")) return { status: 200, body: { ok: true } };
+  const name = str("name"), email = str("email"), phone = str("phone"), message = str("message");
+  if (!name || name.length > 120) return fail(400, "Upi\u0161i ime i prezime.");
+  if (!EMAIL.test(email) || email.length > 200) return fail(400, "Upi\u0161i ispravnu e-mail adresu.");
+  if (phone.length > 40) return fail(400, "Broj telefona je preduga\u010Dak.");
+  if (message.length < 5 || message.length > 4e3) return fail(400, "Napi\u0161i poruku (najvi\u0161e 4000 znakova).");
+  if (b.consent !== true) return fail(400, "Potvrdi da smijemo spremiti tvoje podatke radi odgovora.");
+  const now = Date.now();
+  const list = (recent.get(ip) ?? []).filter((t) => now - t < 10 * 6e4);
+  if (list.length >= 5) return fail(429, "Poslano je previ\u0161e poruka. Poku\u0161aj ponovno za nekoliko minuta.");
+  recent.set(ip, [...list, now]);
+  const { error } = await db.from("contact_messages").insert({ name, email, phone: phone || null, message });
+  if (error) {
+    console.error(error);
+    return fail(500, "Poruka nije poslana. Poku\u0161aj ponovno.");
+  }
+  return { status: 200, body: { ok: true } };
+}
+async function messages(db, secret, token) {
+  const s = verifyToken(secret, token);
+  if (!s) return fail(401, "Prijava je istekla. Upi\u0161i PIN ponovno.");
+  if (s.r !== "owner") return fail(403, "Za ovo treba PIN organizacije.");
+  if (!await pinStillValid(db, s)) return fail(401, "PIN je promijenjen. Upi\u0161i novi PIN.");
+  const { data, error } = await db.from("contact_messages").select("*").order("created_at", { ascending: false }).limit(300);
+  if (error) {
+    console.error(error);
+    return fail(500, "Poruke se ne mogu u\u010Ditati.");
+  }
+  return { status: 200, body: { messages: data } };
+}
 async function ensureOwn(db, table, key, id, tournamentId) {
   const { data } = await db.from(table).select("tournament_id").eq(key, id).maybeSingle();
   if (!data || data.tournament_id !== tournamentId) {
@@ -972,7 +1087,9 @@ async function advance(db, tournamentId, categoryId) {
 }
 export {
   b64urlEncode,
+  contact,
   login,
+  messages,
   mutate,
   notify,
   rawPublicKey,

@@ -17,7 +17,15 @@ import { ScoreEntry, ScorerList } from './pages/Scorer';
 import { Tables } from './pages/Tables';
 import { TeamPage } from './pages/TeamPage';
 import { ClubPage, Clubs } from './pages/hub/Clubs';
-import { HubHome } from './pages/hub/HubHome';
+import { HubHome, Winners } from './pages/hub/HubHome';
+import { About, Impressum } from './pages/site/About';
+import { Contact } from './pages/site/Contact';
+import { Gallery } from './pages/site/Gallery';
+import { More } from './pages/site/More';
+import { NewsList, NewsPage } from './pages/site/News';
+import { SeriesTab } from './pages/site/Series';
+import { Sponsors } from './pages/site/Sponsors';
+import { Videos } from './pages/site/Videos';
 import { GlobalLogin, Organizacija } from './pages/hub/Organizacija';
 import { Privacy } from './pages/hub/Privacy';
 
@@ -33,6 +41,17 @@ export function App() {
           <Route path="/organizacija" element={<Organizacija />} />
           <Route path="/obavijesti" element={<NotifyGuide />} />
           <Route path="/privatnost" element={<Privacy />} />
+          <Route path="/turnir/:key" element={<SeriesTab />} />
+          <Route path="/vise" element={<More />} />
+          <Route path="/vijesti" element={<NewsList />} />
+          <Route path="/vijesti/:id" element={<NewsPage />} />
+          <Route path="/galerija" element={<Gallery />} />
+          <Route path="/video" element={<Videos />} />
+          <Route path="/sponzori" element={<Sponsors />} />
+          <Route path="/o-nama" element={<About />} />
+          <Route path="/impresum" element={<Impressum />} />
+          <Route path="/kontakt" element={<Contact />} />
+          <Route path="/pobjednici" element={<Winners />} />
         </Route>
         <Route path="/t/:slug/*" element={<TournamentRoutes />} />
         <Route path="*" element={<Navigate to="/" replace />} />

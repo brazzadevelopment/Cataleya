@@ -58,18 +58,40 @@ export function isInAppBrowser(): boolean {
   return /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\/|TikTok|Snapchat|; wv\)/i.test(navigator.userAgent);
 }
 
-/** Na Androidu treba Chrome; na iPhoneu Safari. Vraća poruku ako je otvoreno u krivom pregledniku. */
-export function wrongBrowser(): 'samsung' | 'inapp' | null {
-  if (isStandalone() || isNativeApp()) return null;
-  if (isSamsungBrowser()) return 'samsung';
-  if (isInAppBrowser()) return 'inapp';
-  return null;
+export function isMobile(): boolean {
+  return isIos() || /android/i.test(navigator.userAgent);
 }
 
-/** Link koji na Androidu otvara trenutnu stranicu u Chromeu. */
+/** Pravi Chrome (Android ili iPhone), ne Samsung, Safari, Instagram, Facebook… */
+export function isChrome(): boolean {
+  const ua = navigator.userAgent;
+  if (isIos()) return /CriOS/.test(ua) && !isInAppBrowser();
+  return /Chrome\/\d/.test(ua) && !/SamsungBrowser|EdgA|OPR|OPT\/|Firefox|YaBrowser|MiuiBrowser|HuaweiBrowser|UCBrowser|VivoBrowser|HeyTap|; wv\)|FBAN|FBAV|Instagram|Line\//.test(ua);
+}
+
+/**
+ * Aplikacija se otvara samo u Chromeu (Android i iPhone), kao i aplikacije KlubAppa.
+ * Vraća vrstu krivog preglednika na mobitelu, ili null.
+ */
+export function wrongBrowser(): 'samsung' | 'inapp' | 'other' | null {
+  if (isStandalone() || isNativeApp() || !isMobile() || isChrome()) return null;
+  if (isSamsungBrowser()) return 'samsung';
+  if (isInAppBrowser()) return 'inapp';
+  return 'other';
+}
+
+export const CHROME_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.android.chrome';
+export const CHROME_APPSTORE_URL = 'https://apps.apple.com/app/google-chrome/id535886823';
+export function chromeStoreUrl(): string {
+  return isIos() ? CHROME_APPSTORE_URL : CHROME_PLAY_URL;
+}
+
+/** Link koji otvara trenutnu stranicu u Chromeu (Android: bez Chromea vodi na Google Play). */
 export function chromeIntentUrl(): string {
   const { host, pathname, search } = location;
-  return `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;end`;
+  return isIos()
+    ? `googlechromes://${host}${pathname}${search}`
+    : `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(CHROME_PLAY_URL)};end`;
 }
 
 export function isStandalone(): boolean {
@@ -149,11 +171,23 @@ interface InstallPrompt extends Event {
   prompt(): Promise<void>;
 }
 let installEvent: InstallPrompt | null = null;
+const installListeners = new Set<() => void>();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     installEvent = e as InstallPrompt;
+    installListeners.forEach((l) => l());
   });
+  window.addEventListener('appinstalled', () => {
+    installEvent = null;
+    installListeners.forEach((l) => l());
+  });
+}
+
+/** Javi kad Chrome ponudi instalaciju ili kad je aplikacija instalirana. */
+export function onInstallChange(l: () => void): () => void {
+  installListeners.add(l);
+  return () => void installListeners.delete(l);
 }
 
 export function canInstall(): boolean {

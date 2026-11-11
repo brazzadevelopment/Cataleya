@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { Admin } from './admin/Admin';
 import { HubLayout } from './components/HubLayout';
+import { ChromeGate } from './components/ChromeGate';
 import { Layout } from './components/Layout';
 import { TournamentProvider } from './data/TournamentContext';
 import { Bracket, FinalStandings } from './pages/Bracket';
@@ -32,6 +33,7 @@ import { Privacy } from './pages/hub/Privacy';
 export function App() {
   return (
     <BrowserRouter>
+      <ChromeGate />
       <Routes>
         <Route element={<HubLayout />}>
           <Route path="/" element={<HubHome />} />

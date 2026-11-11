@@ -77,7 +77,7 @@ export function NotificationsCard() {
 
       {support === 'unsupported' && (
         <p className="mt-3 text-[13px] leading-relaxed text-white/65">
-          Ovaj preglednik ne podržava obavijesti. {isIos() ? 'Otvori stranicu u Safariju i dodaj je na početni zaslon.' : 'Otvori stranicu u Chromeu.'}{' '}
+          Ovaj preglednik ne podržava obavijesti. Otvori stranicu u Chromeu i dodaj je na početni zaslon.{' '}
           <Link to={guide} className="font-bold text-brand-soft">Upute</Link>
         </p>
       )}

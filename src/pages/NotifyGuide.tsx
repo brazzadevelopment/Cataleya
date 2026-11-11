@@ -63,12 +63,10 @@ export function NotifyGuide() {
 
       {tab === 'iphone' ? (
         <>
-          <SectionTitle>Video</SectionTitle>
-          <Video name="iphone" />
           <SectionTitle>Korak po korak</SectionTitle>
           <Steps>
-            <Step title="Otvori stranicu u Safariju">U Chromeu ili Facebooku na iPhoneu ne ide; mora biti Safari.</Step>
-            <Step title={<>Dodirni Dijeli <span className="text-white/60">(kvadrat sa strelicom prema gore)</span></>}>Na dnu ekrana, ili gore desno na iPadu.</Step>
+            <Step title="Otvori stranicu u Chromeu">Ne u Safariju, Instagramu ili Facebooku. Nemaš Chrome? Preuzmi ga iz App Storea.</Step>
+            <Step title={<>Dodirni Dijeli <span className="text-white/60">(kvadrat sa strelicom prema gore)</span></>}>U adresnoj traci Chromea, gore desno.</Step>
             <Step title="Odaberi „Dodaj na početni zaslon”">Ako ga ne vidiš, pomakni popis prema dolje. Zatim dodirni „Dodaj”.</Step>
             <Step title="Otvori Cataleya Cup s početnog zaslona">Ikona s cvijetom. Od sada aplikaciju otvaraj s te ikone.</Step>
             <Step title="Označi svoju momčad zvjezdicom">Možeš i više momčadi.</Step>

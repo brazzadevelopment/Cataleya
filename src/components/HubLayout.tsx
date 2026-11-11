@@ -6,7 +6,7 @@ import { useOrgSession } from '../data/follow';
 import { isNativeApp } from '../lib/native';
 import { isStandalone, pushSupport, readPrefs } from '../lib/push';
 import { SERIES } from '../lib/series';
-import { BrowserWarning } from './BrowserWarning';
+import { InstallBanner } from './ChromeGate';
 import { Icon, TeamBadge } from './ui';
 
 /** Okvir za stranice Cataleya Cupa izvan jednog turnira (početna, vijesti, klubovi, organizacija…). */
@@ -19,6 +19,7 @@ export function HubLayout() {
           Demo · podaci su samo na ovom uređaju
         </div>
       )}
+      <InstallBanner />
       <header className="sticky top-0 z-20 border-b border-line bg-pitch-950/85 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
         <div className="flex items-center gap-3">
           <NavLink to="/" className="flex min-w-0 items-center gap-3">
@@ -87,12 +88,14 @@ function seenWelcome(): boolean {
 }
 
 /**
- * Samo kod prvog otvaranja: kako dodati aplikaciju na početni zaslon i uključiti
- * obavijesti. Poslije se ne pokazuje (sve je u Više → Obavijesti).
+ * Prvo otvaranje s početnog zaslona (ili iz trgovine): poziv da uključi obavijesti.
+ * U pregledniku na mobitelu umjesto toga stoje ChromeGate i traka „Dodaj na početni zaslon”.
  */
 function Welcome() {
   const [open, setOpen] = useState(() => !seenWelcome());
-  if (!open) return null;
+  const installed = isStandalone() || isNativeApp();
+  const push = pushSupport();
+  if (!open || !installed || push === 'unsupported' || readPrefs().enabled) return null;
   const close = () => {
     try {
       localStorage.setItem(WELCOME_KEY, '1');
@@ -101,9 +104,6 @@ function Welcome() {
     }
     setOpen(false);
   };
-  const installed = isStandalone() || isNativeApp();
-  const push = pushSupport();
-  const pushOn = readPrefs().enabled;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 backdrop-blur-sm" onClick={close}>
       <div
@@ -117,24 +117,13 @@ function Welcome() {
         <p className="mt-2 text-[14px] leading-relaxed text-white/80">
           Raspored, rezultati uživo, tablice i obavijesti za sve turnire Cataleya Cupa.
         </p>
-        <BrowserWarning />
-        <ul className="mt-4 space-y-2 text-left text-[14px]">
-          {!installed && (
-            <li className="card flex items-center gap-3 p-3">
-              <Icon name="home" className="size-6 shrink-0 text-brand-soft" />
-              <span><b>Dodaj na početni zaslon</b><span className="block text-[12px] text-white/65">Otvara se kao prava aplikacija, jednim dodirom.</span></span>
-            </li>
-          )}
-          {push !== 'unsupported' && !pushOn && (
-            <li className="card flex items-center gap-3 p-3">
-              <Icon name="bell" className="size-6 shrink-0 text-brand-soft" />
-              <span><b>Obavijest za svaki gol</b><span className="block text-[12px] text-white/65">Označi svoj klub zvjezdicom i uključi obavijesti.</span></span>
-            </li>
-          )}
-        </ul>
+        <div className="card mt-4 flex items-center gap-3 p-3 text-left text-[14px]">
+          <Icon name="bell" className="size-6 shrink-0 text-brand-soft" />
+          <span><b>Obavijest za svaki gol</b><span className="block text-[12px] text-white/65">Označi svoj klub zvjezdicom i uključi obavijesti.</span></span>
+        </div>
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button type="button" onClick={close} className="min-h-11 rounded-xl bg-white/10 px-4 text-sm font-extrabold ring-1 ring-white/15">Kasnije</button>
-          <Link to="/obavijesti" onClick={close} className="grid min-h-11 place-items-center rounded-xl bg-white px-4 text-sm font-extrabold text-ink">Pokaži kako</Link>
+          <Link to="/obavijesti" onClick={close} className="grid min-h-11 place-items-center rounded-xl bg-white px-4 text-sm font-extrabold text-ink">Uključi</Link>
         </div>
       </div>
     </div>

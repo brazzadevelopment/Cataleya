@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTournament } from '../data/TournamentContext';
 import { source } from '../data/source';
+import { InstallBanner } from './ChromeGate';
 import { Chip, Emblem, Icon } from './ui';
 
 export function Layout() {
@@ -16,6 +17,7 @@ export function Layout() {
           Demo · podaci su samo na ovom uređaju
         </div>
       )}
+      <InstallBanner />
       <header className="sticky top-0 z-20 border-b border-line bg-pitch-950/85 px-4 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
         <div className="flex items-center gap-3">
           <NavLink to="/" aria-label="Svi turniri Cataleya Cupa" className="-ml-2 -mr-1 grid size-8 shrink-0 place-items-center rounded-full text-white/60">
